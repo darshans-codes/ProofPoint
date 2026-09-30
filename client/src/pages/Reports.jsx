@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getReports, getAssets, getSuggestedPairs, createReport } from '../api/client';
 import { useProject } from '../context/ProjectContext';
@@ -27,6 +28,7 @@ export default function Reports() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const closeButtonRef = useRef(null);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (!modalOpen) return undefined;
@@ -240,15 +242,32 @@ export default function Reports() {
 
       {/* 3-Step Report Creation Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 bg-[#1B221D]/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl bg-[#FBF9F4] border border-[#D8D2C4] rounded-[2px] overflow-hidden flex flex-col max-h-[90vh]">
+        <motion.div
+          className="fixed inset-0 z-50 bg-[#1B221D]/60 flex items-center justify-center p-4"
+          initial={reducedMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={reducedMotion ? undefined : { opacity: 0 }}
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setModalOpen(false);
+          }}
+        >
+          <motion.div
+            className="w-full max-w-3xl max-h-[90vh] bg-[#FBF9F4] border border-[#D8D2C4] rounded-[2px] flex flex-col"
+            initial={reducedMotion ? false : { y: 18, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="report-modal-title"
+          >
             {/* Modal Header */}
             <div className="p-4 border-b border-[#D8D2C4] bg-[#F5F2EB] flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-mono text-[#5F6A61] uppercase tracking-wider block">
                   STEP {step} OF 3
                 </span>
-                <h3 className="font-serif text-lg font-semibold text-[#1B221D]">
+                <h3 id="report-modal-title" className="font-serif text-lg font-semibold text-[#1B221D]">
                   {step === 1 && 'Choose Project & Evidence Records'}
                   {step === 2 && 'Select Comparative Before/After Anchor'}
                   {step === 3 && 'Review Dossier & Generate Factual Arc'}
@@ -281,7 +300,7 @@ export default function Reports() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[#1B221D] uppercase">Concession *</label>
+                      <label className="text-[#1B221D] uppercase">Project *</label>
                       <select
                         value={modalProjectId}
                         onChange={(e) => setModalProjectId(e.target.value)}
@@ -301,16 +320,19 @@ export default function Reports() {
                       <span className="text-[#1B221D] uppercase">
                         Select Evidentiary Frames ({selectedAssetIds.size} of {projectAssets.length} selected):
                       </span>
-                      <span className="text-[10px] text-[#2F6B4A]">VERIFIED FRAMES PRE-SELECTED</span>
+                      <span className="text-[10px] text-[#2F6B4A]">SELECT RECORDS FOR REVIEW</span>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-56 overflow-y-auto p-1 border border-[#D8D2C4] bg-[#F5F2EB]">
                       {projectAssets.map((asset) => {
                         const isSelected = selectedAssetIds.has(asset._id);
                         return (
-                          <div
+                          <button
+                            type="button"
                             key={asset._id}
                             onClick={() => toggleSelectAsset(asset._id)}
+                            aria-pressed={isSelected}
+                            aria-label={`${isSelected ? 'Remove' : 'Select'} evidence frame PP-${asset._id.slice(-4).toUpperCase()}`}
                             className={`p-1.5 border rounded-[1px] cursor-pointer transition-colors relative ${
                               isSelected
                                 ? 'border-[#2F5D46] bg-[#E4EEE7]'
@@ -332,7 +354,7 @@ export default function Reports() {
                                 size="sm"
                               />
                             </div>
-                          </div>
+                            </button>
                         );
                       })}
                     </div>
@@ -457,8 +479,8 @@ export default function Reports() {
                 </button>
               )}
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
     </div>
   );

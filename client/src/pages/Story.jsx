@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { useParams, Link } from 'react-router-dom';
 import { getReportBySlug } from '../api/client';
 import CompareViewer from '../components/CompareViewer';
@@ -14,6 +15,7 @@ export default function Story() {
   const [loading, setLoading] = useState(true);
   const [copiedCaption, setCopiedCaption] = useState(false);
   const [copyError, setCopyError] = useState('');
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     async function loadStory() {
@@ -67,8 +69,20 @@ export default function Story() {
   }
 
   const heroImage = report.heroAssetId || report.beforeAssetId;
+  const reportStatus = report.assetIds?.every(
+    (asset) => asset.verification?.status === 'verified'
+  )
+    ? 'verified'
+    : report.assetIds?.some((asset) => asset.verification?.status === 'flagged')
+    ? 'flagged'
+    : 'needs_review';
 
   const assets = report.assetIds || [];
+  const provenanceCoverage = assets.length
+    ? Math.round(
+        (assets.filter((asset) => asset.provenance?.length > 0).length / assets.length) * 100
+      )
+    : 0;
 
   const verificationRows = assets.flatMap((asset) =>
     (asset.verification?.checks || []).map((check) => ({
@@ -132,7 +146,12 @@ export default function Story() {
       {/* Main Editorial Story Document Container */}
       <div className="max-w-[960px] mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-16">
         {/* Dateline & Document Header */}
-        <div className="space-y-4 text-center sm:text-left">
+        <motion.div
+          className="space-y-4 text-center sm:text-left"
+          initial={reducedMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
+        >
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-mono text-[#5F6A61] uppercase tracking-wider justify-center sm:justify-start">
             <span className="font-semibold text-[#1B221D]">{report.project?.name}</span>
             <span>•</span>
@@ -152,15 +171,20 @@ export default function Story() {
           )}
 
           <div className="pt-2 flex items-center gap-3 justify-center sm:justify-start">
-            <VerificationStamp status="verified" score={report.verifiedPercent} size="md" />
+            <VerificationStamp status={reportStatus} score={report.verifiedPercent} size="md" />
             <span className="text-xs font-mono text-[#5F6A61]">
               DOCUMENTARY EVIDENCE AUDIT #{report.slug.slice(-8).toUpperCase()}
             </span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Large Hero Photography Frame */}
-        <div className="relative w-full aspect-[16/10] border border-[#D8D2C4] bg-[#1B221D] overflow-hidden rounded-[2px]">
+        <motion.div
+          className="relative w-full aspect-[16/10] border border-[#D8D2C4] bg-[#1B221D] overflow-hidden rounded-[2px]"
+          initial={reducedMotion ? false : { opacity: 0, scale: 0.985 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: reducedMotion ? 0 : 0.08, ease: 'easeOut' }}
+        >
           <EvidenceImage
             asset={heroImage}
             variant="medium"
@@ -168,9 +192,12 @@ export default function Story() {
             className="w-full h-full object-cover"
           />
           <div className="absolute bottom-3 left-3 bg-[#1B221D] text-[#F5F2EB] text-[10px] font-mono px-2 py-1 rounded-[1px]">
-            FIELD RECORDING • {report.project?.location}
+            {report.assetIds?.[0]?.sourceMetadata?.type === 'public_source_demo'
+              ? 'PUBLIC-SOURCE DEMO • '
+              : 'FIELD RECORDING • '}
+            {report.project?.location}
           </div>
-        </div>
+        </motion.div>
 
         {/* Key Figures Strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 border-y border-[#D8D2C4] py-8 gap-6 text-center sm:text-left divide-y sm:divide-y-0 sm:divide-x divide-[#D8D2C4]">
@@ -203,7 +230,7 @@ export default function Story() {
               CHAIN OF CUSTODY
             </span>
             <div className="font-serif text-4xl text-[#1B221D]">
-              100%
+              {provenanceCoverage}%
             </div>
             <div className="text-[10px] font-mono text-[#5F6A61] mt-1">
               EXIF TRACEABILITY

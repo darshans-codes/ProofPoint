@@ -391,9 +391,9 @@ export default function AssetDetail() {
         {/* Chain of Custody Ledger */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-[#F5F2EB] border border-[#D8D2C4] text-xs font-mono">
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-start gap-2">
               <span className="text-[#5F6A61] uppercase">CLOUDINARY STORAGE ID:</span>
-              <span className="font-semibold text-[#1B221D]">{asset.cloudinary?.publicId}</span>
+              <span className="min-w-0 break-all font-semibold text-[#1B221D]">{asset.cloudinary?.publicId}</span>
             </div>
             <button
               onClick={copyPublicId}

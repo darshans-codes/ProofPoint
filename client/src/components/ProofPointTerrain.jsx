@@ -132,7 +132,7 @@ export default function ProofPointTerrain({ className = 'h-[500px] w-full', loca
       <div className="absolute top-4 left-4 z-10 text-[10px] font-mono text-[#5F6A61] pointer-events-none space-y-0.5">
         <div>PROJECTION: GEODETIC WGS-84</div>
         <div>TOPOGRAPHIC RESOLUTION: 0.05°</div>
-        <div>VERIFIED ANCHORS: {locations.length} PROJECTS</div>
+        <div>GPS ANCHORS: {locations.length} PROJECTS</div>
       </div>
 
       {hasWebGL && locations.length > 0 ? (
