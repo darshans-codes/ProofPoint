@@ -21,6 +21,8 @@ export default function Compare() {
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [comparisonError, setComparisonError] = useState('');
   const [generatingReport, setGeneratingReport] = useState(false);
+  const beforeId = selectedPair?.before?._id;
+  const afterId = selectedPair?.after?._id;
 
   // Load suggested pairs
   useEffect(() => {
@@ -47,13 +49,15 @@ export default function Compare() {
 
   // When selectedPair changes, execute comparison
   useEffect(() => {
-    if (!selectedPair?.before?._id || !selectedPair?.after?._id) return;
+    if (!beforeId || !afterId) return;
+    let active = true;
 
     async function runComparison() {
       const hasMedia =
         getEvidenceImageUrl(selectedPair.before, 'medium') &&
         getEvidenceImageUrl(selectedPair.after, 'medium');
 
+      if (!active) return;
       setComparisonData(null);
       if (!hasMedia) {
         setComparisonError('');
@@ -64,21 +68,23 @@ export default function Compare() {
       setLoadingCompare(true);
       setComparisonError('');
       try {
-        const res = await compareAssets(
-          selectedPair.before._id,
-          selectedPair.after._id
-        );
-        setComparisonData(res);
+        const res = await compareAssets(beforeId, afterId);
+        if (active) setComparisonData(res);
       } catch (err) {
         console.error('[Compare] Execution error:', err);
-        setComparisonError(err.response?.data?.error || 'This comparison could not be evaluated.');
+        if (active) {
+          setComparisonError(err.response?.data?.error || 'This comparison could not be evaluated.');
+        }
       } finally {
-        setLoadingCompare(false);
+        if (active) setLoadingCompare(false);
       }
     }
 
     runComparison();
-  }, [selectedPair]);
+    return () => {
+      active = false;
+    };
+  }, [beforeId, afterId]);
 
   // Quick report creation from current pair
   const handleAddToReport = async () => {

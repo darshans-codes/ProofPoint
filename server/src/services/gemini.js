@@ -16,10 +16,13 @@ if (apiKey && apiKey !== 'your_gemini_api_key') {
 
 // Simple concurrency queue: at most 2 concurrent Gemini calls
 class ConcurrencyQueue {
-  constructor(concurrency = 2) {
+  constructor(concurrency = 2, minStartIntervalMs = 12_000) {
     this.concurrency = concurrency;
+    this.minStartIntervalMs = minStartIntervalMs;
     this.running = 0;
     this.queue = [];
+    this.lastStartedAt = 0;
+    this.timer = null;
   }
 
   enqueue(fn) {
@@ -29,25 +32,41 @@ class ConcurrencyQueue {
     });
   }
 
-  async dequeue() {
+  dequeue() {
     if (this.running >= this.concurrency || this.queue.length === 0) {
       return;
     }
+
+    const waitMs = Math.max(0, this.minStartIntervalMs - (Date.now() - this.lastStartedAt));
+    if (waitMs > 0) {
+      if (!this.timer) {
+        this.timer = setTimeout(() => {
+          this.timer = null;
+          this.dequeue();
+        }, waitMs);
+      }
+      return;
+    }
+
+    this.lastStartedAt = Date.now();
     this.running++;
     const { fn, resolve, reject } = this.queue.shift();
-    try {
-      const result = await fn();
-      resolve(result);
-    } catch (err) {
-      reject(err);
-    } finally {
-      this.running--;
-      this.dequeue();
-    }
+    Promise.resolve()
+      .then(fn)
+      .then(resolve, reject)
+      .finally(() => {
+        this.running--;
+        this.dequeue();
+      });
   }
 }
 
-const geminiQueue = new ConcurrencyQueue(2);
+// Keep the existing two-worker ceiling, but pace starts to the free-tier's
+// five requests per minute instead of allowing bursts.
+const geminiQueue = new ConcurrencyQueue(2, 12_000);
+const comparisonInFlight = new Map();
+const comparisonCache = new Map();
+const COMPARISON_CACHE_TTL_MS = 10 * 60 * 1000;
 
 export const GEMINI_UNAVAILABLE_MESSAGE =
   'Visual analysis temporarily unavailable. The evidence was uploaded successfully and can be re-analyzed later.';
@@ -80,6 +99,21 @@ function getConciseReason(error) {
   return reason || 'request failed';
 }
 
+function getRetryAfterMs(error) {
+  const retryAfter =
+    error?.response?.headers?.['retry-after'] ||
+    error?.response?.headers?.get?.('retry-after') ||
+    error?.headers?.['retry-after'] ||
+    error?.headers?.get?.('retry-after');
+
+  if (retryAfter === undefined || retryAfter === null) return null;
+  const seconds = Number(retryAfter);
+  if (Number.isFinite(seconds)) return Math.min(60_000, Math.max(12_000, seconds * 1000));
+
+  const date = Date.parse(String(retryAfter));
+  return Number.isNaN(date) ? null : Math.min(60_000, Math.max(12_000, date - Date.now()));
+}
+
 function isTransientError(error) {
   const status = getErrorStatus(error);
   return status === 408 || status === 429 || (status >= 500 && status <= 599);
@@ -95,10 +129,11 @@ function unavailableResult(reason, status) {
   };
 }
 
-// Bounded exponential backoff with jitter. Maximum wait is 20 seconds.
-async function withRetry(operation, maxRetries = 5) {
-  const baseDelay = 1500;
-  const maxDelay = 20000;
+// Bounded retry with RPM-safe pacing. Rate-limit responses receive only one
+// retry and honor Retry-After when the provider supplies it.
+async function withRetry(operation, maxRetries = 3) {
+  const baseDelay = 12_000;
+  const maxDelay = 60_000;
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -110,12 +145,16 @@ async function withRetry(operation, maxRetries = 5) {
       const reason = getConciseReason(error);
       console.warn(`[Gemini] Attempt ${attempt}/${maxRetries} failed${status ? ` (${status})` : ''}: ${reason}`);
 
-      if (!isTransientError(error) || attempt === maxRetries) {
+      const retryLimit = status === 429 ? 2 : maxRetries;
+      if (!isTransientError(error) || attempt === retryLimit) {
         break;
       }
 
-      const exponentialDelay = Math.min(maxDelay, baseDelay * 2 ** (attempt - 1));
-      const jitteredDelay = Math.round(exponentialDelay * (0.5 + Math.random()));
+      const retryAfterMs = status === 429 ? getRetryAfterMs(error) : null;
+      const exponentialDelay = retryAfterMs || Math.min(maxDelay, baseDelay * 2 ** (attempt - 1));
+      const jitteredDelay = retryAfterMs
+        ? Math.min(maxDelay, retryAfterMs + Math.round(retryAfterMs * Math.random() * 0.25))
+        : Math.round(exponentialDelay * (0.5 + Math.random()));
       await new Promise((resolve) => setTimeout(resolve, jitteredDelay));
     }
   }
@@ -204,7 +243,22 @@ export async function compareImages(beforeBuffer, afterBuffer, mimeBefore = 'ima
 
   const prompt = `Compare these two field photos (before and after) for an environmental restoration/sustainability project. Return ONLY JSON: {"summary":string (2-3 factual sentences),"changes":[{"aspect":string,"before":string,"after":string,"direction":"improved"|"worsened"|"neutral"}],"confidence":"low"|"medium"|"high"}.`;
 
-  return geminiQueue.enqueue(() =>
+  const comparisonKey = [
+    beforeBuffer.length,
+    beforeBuffer.subarray(0, 32).toString('hex'),
+    afterBuffer.length,
+    afterBuffer.subarray(0, 32).toString('hex'),
+    mimeBefore,
+    mimeAfter,
+  ].join(':');
+  const cached = comparisonCache.get(comparisonKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+  if (cached) comparisonCache.delete(comparisonKey);
+
+  const existing = comparisonInFlight.get(comparisonKey);
+  if (existing) return existing;
+
+  const request = geminiQueue.enqueue(() =>
     withRetry(async () => {
       const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
       const response = await ai.models.generateContent({
@@ -237,19 +291,58 @@ export async function compareImages(beforeBuffer, afterBuffer, mimeBefore = 'ima
 
       return { ok: true, ...JSON.parse(response.text?.trim() || '{}') };
     })
-  );
+  ).then((result) => {
+    comparisonCache.set(comparisonKey, {
+      result,
+      expiresAt: Date.now() + COMPARISON_CACHE_TTL_MS,
+    });
+    return result;
+  }).finally(() => {
+    comparisonInFlight.delete(comparisonKey);
+  });
+
+  comparisonInFlight.set(comparisonKey, request);
+  return request;
 }
 
-export async function generateReportNarrative({ title, projectName, locationName, assetCount, verifiedCount, metrics }) {
-  if (!ai) {
+export async function generateReportNarrative({
+  title,
+  projectName,
+  locationName,
+  assetCount,
+  verifiedCount,
+  metrics,
+  publicSourceDemo = false,
+  sourceDetails = [],
+}) {
+  if (publicSourceDemo) {
+    const dates = sourceDetails
+      .map((source) => source.sourceDate)
+      .filter(Boolean)
+      .sort();
+    const dateText = dates.length > 1
+      ? `${dates[0]} and ${dates[dates.length - 1]}`
+      : dates[0] || 'two documented points in time';
+    const context = sourceDetails.find((source) => source.context)?.context || locationName;
+    const credit = sourceDetails.find((source) => source.credit)?.credit;
+
     return {
-      headline: `Verified Impact Documentation for ${projectName}`,
-      narrative: `Field teams completed documented interventions at ${locationName}, capturing ${assetCount} evidentiary records (${verifiedCount} verified). Visual analysis indicates measurable improvements across native vegetation and waste remediation benchmarks. All records maintain cryptographic and EXIF chain of custody.`,
-      socialCaption: `Documented restoration progress at ${projectName}: ${verifiedCount} verified evidence records confirm site revitalization. #ProofPoint #OpenData #EnvironmentalImpact`,
+      headline: `Public-source photographs from ${context}`,
+      narrative: `The ${assetCount} public-source photographs document ${context} at ${dateText}. They are presented here as demonstration data, not as photographs collected by ProofPoint or an NGO field team. Source attribution${credit ? ` credits ${credit}` : ''}; the records retain their available provenance and verification results. No environmental outcome, intervention, or grant-compliance claim is made from this material.`,
+      socialCaption: `Public-source demonstration data: ${assetCount} photographs documenting ${context}. Attribution and verification status are preserved; no field-collection or grant-compliance claim is made.`,
     };
   }
 
-  const prompt = `You generate factual environmental project impact report narratives for NGO donors and auditors. Return ONLY JSON: {"headline":string,"narrative":string (150-200 words, factual, before/after arc),"socialCaption":string (<280 chars, 2-3 hashtags)}.
+  if (!ai) {
+    return {
+      headline: `Evidence documentation for ${projectName}`,
+      narrative: `${assetCount} evidentiary records are associated with ${locationName}. ${verifiedCount} records are currently marked verified by the stored verification results. This report does not infer field operations, environmental outcomes, or causality beyond the available records.`,
+      socialCaption: `Evidence documentation for ${projectName}: ${verifiedCount} of ${assetCount} records are marked verified. Review the source and verification details before drawing conclusions.`,
+    };
+  }
+
+  const prompt = `You generate a strictly evidence-grounded report narrative. Return ONLY JSON: {"headline":string,"narrative":string (150-200 words, factual, before/after arc),"socialCaption":string (<280 chars, 2-3 hashtags)}.
+Never invent field teams, interventions, project operations, donor or grant claims, environmental measurements, outcomes, or unsupported causality. Do not imply that ProofPoint or an NGO collected evidence unless the supplied data explicitly says so. Use only the supplied metadata, verification results, stored metrics, and comparison observations. If evidence is insufficient, state that limitation plainly.
 Project: ${projectName}
 Title: ${title}
 Location: ${locationName}

@@ -22,6 +22,19 @@ export const createReport = asyncHandler(async (req, res) => {
 
   const verifiedCount = assets.filter((a) => a.verification?.status === 'verified').length;
   const verifiedPercent = assets.length > 0 ? Math.round((verifiedCount / assets.length) * 100) : 0;
+  const publicSourceDemo = assets.length > 0 && assets.every(
+    (asset) => asset.sourceMetadata?.type === 'public_source_demo'
+  );
+  const sourceDetails = assets
+    .map((asset) => asset.sourceMetadata)
+    .filter(Boolean)
+    .map((source) => ({
+      sourceDate: source.sourceDate
+        ? new Date(source.sourceDate).toISOString().slice(0, 10)
+        : null,
+      credit: source.credit,
+      context: source.context,
+    }));
 
   // Compute metrics summary
   let totalTrees = 0;
@@ -47,6 +60,8 @@ export const createReport = asyncHandler(async (req, res) => {
     assetCount: assets.length,
     verifiedCount,
     metrics: metricsObj,
+    publicSourceDemo,
+    sourceDetails,
   });
 
   const slug = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}-${crypto.randomBytes(4).toString('hex')}`;
@@ -64,11 +79,11 @@ export const createReport = asyncHandler(async (req, res) => {
     headline: aiStory?.headline || `${project.name}: Verified Field Impact`,
     narrative:
       aiStory?.narrative ||
-      `Field operations documented at ${project.location} yielded ${assets.length} evidentiary records. All records underwent multi-factor integrity verification.`,
+      `${assets.length} evidentiary records are associated with ${project.location}. The report reflects the stored verification results and does not infer field operations or environmental outcomes beyond the available records.`,
     socialCaption:
       aiStory?.socialCaption ||
-      `Documented environmental progress in ${project.name}: ${verifiedPercent}% verified evidence records. #ProofPoint #OpenImpact`,
-    metricsSummary: [
+      `Evidence documentation for ${project.name}: ${verifiedPercent}% of records are marked verified. Review the source and verification details before drawing conclusions.`,
+    metricsSummary: publicSourceDemo ? [] : [
       {
         label: 'Verified Records',
         before: '0%',

@@ -84,6 +84,12 @@ export default function Story() {
     : 'needs_review';
 
   const assets = report.assetIds || [];
+  const isPublicSourceDemo = assets.length > 0 && assets.every(
+    (asset) => asset.sourceMetadata?.type === 'public_source_demo'
+  );
+  const sourceAttribution = isPublicSourceDemo
+    ? assets.find((asset) => asset.sourceMetadata?.credit)?.sourceMetadata
+    : null;
   const provenanceCoverage = assets.length
     ? Math.round(
         (assets.filter((asset) => asset.provenance?.length > 0).length / assets.length) * 100
@@ -177,11 +183,22 @@ export default function Story() {
           )}
 
           <div className="pt-2 flex items-center gap-3 justify-center sm:justify-start">
-            <VerificationStamp status={reportStatus} score={report.verifiedPercent} size="md" />
+            {isPublicSourceDemo ? (
+              <div className="inline-flex items-center border border-[#9A6B12] bg-[#F4E9CF] px-2 py-1 text-[11px] font-mono uppercase text-[#9A6B12]">
+                DEMO — EVIDENCE REQUIRES REVIEW
+              </div>
+            ) : (
+              <VerificationStamp status={reportStatus} score={report.verifiedPercent} size="md" />
+            )}
             <span className="text-xs font-mono text-[#5F6A61]">
               DOCUMENTARY EVIDENCE AUDIT #{report.slug.slice(-8).toUpperCase()}
             </span>
           </div>
+          {sourceAttribution && (
+            <p className="max-w-2xl text-xs font-mono text-[#5F6A61]">
+              PUBLIC SOURCE: {sourceAttribution.credit} · {sourceAttribution.license} · {sourceAttribution.url}
+            </p>
+          )}
         </motion.div>
 
         {/* Large Hero Photography Frame */}
@@ -219,7 +236,7 @@ export default function Story() {
             <span className="text-[10px] font-mono text-[#5F6A61] uppercase tracking-wider block mb-1">
               VERIFIED RATE
             </span>
-            <div className="font-serif text-4xl text-[#2F6B4A]">
+            <div className={`font-serif text-4xl ${isPublicSourceDemo ? 'text-[#9A6B12]' : 'text-[#2F6B4A]'}`}>
               {report.verifiedPercent}%
             </div>
             <div className="text-[10px] font-mono text-[#5F6A61] mt-1">
@@ -256,10 +273,10 @@ export default function Story() {
               DONOR AUDIT STATUS
             </span>
             <div className="font-serif text-4xl text-[#2F6B4A]">
-              CLEAR
+              {isPublicSourceDemo ? 'DEMO — REVIEW' : 'REVIEW STATUS'}
             </div>
-            <div className="text-[10px] font-mono text-[#2F6B4A] mt-1">
-              COMPLIANT FOR GRANTS
+            <div className={`text-[10px] font-mono mt-1 ${isPublicSourceDemo ? 'text-[#9A6B12]' : 'text-[#2F6B4A]'}`}>
+              {isPublicSourceDemo ? 'PUBLIC-SOURCE DATA; NOT GRANT CLEARANCE' : 'DERIVED FROM RECORDED CHECKS'}
             </div>
           </div>
         </motion.div>

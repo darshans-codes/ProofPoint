@@ -88,9 +88,20 @@ export const getSuggestedPairs = async (projectId) => {
 };
 
 // Compare
+const comparisonRequests = new Map();
+
 export const compareAssets = async (beforeId, afterId) => {
-  const { data } = await api.post('/compare', { beforeId, afterId });
-  return data;
+  const key = `${beforeId}:${afterId}`;
+  const existing = comparisonRequests.get(key);
+  if (existing) return existing;
+
+  const request = api
+    .post('/compare', { beforeId, afterId })
+    .then(({ data }) => data)
+    .finally(() => comparisonRequests.delete(key));
+
+  comparisonRequests.set(key, request);
+  return request;
 };
 
 // Reports

@@ -2,6 +2,10 @@ import { Asset } from '../models/Asset.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { compareImages } from '../services/gemini.js';
 
+const comparisonInFlight = new Map();
+const comparisonCache = new Map();
+const COMPARISON_CACHE_TTL_MS = 10 * 60 * 1000;
+
 function getUsableMediaUrl(asset) {
   const urls = [
     asset?.transformations?.medium,
@@ -18,7 +22,7 @@ function getUsableMediaUrl(asset) {
   );
 }
 
-export const compareAssets = asyncHandler(async (req, res) => {
+async function executeComparison(req, res) {
   const { beforeId, afterId } = req.body;
 
   if (!beforeId || !afterId) {
@@ -136,4 +140,54 @@ export const compareAssets = asyncHandler(async (req, res) => {
     comparison: comparisonResult,
     metricsSummary,
   });
+}
+
+export const compareAssets = asyncHandler(async (req, res) => {
+    const { beforeId, afterId } = req.body;
+    if (!beforeId || !afterId) {
+      return res.status(400).json({ error: 'both beforeId and afterId are required.' });
+    }
+
+    const key = `${beforeId}:${afterId}`;
+    const cached = comparisonCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.json(cached.body);
+    }
+    if (cached) comparisonCache.delete(key);
+
+    const existing = comparisonInFlight.get(key);
+    if (existing) {
+      return res.json(await existing);
+    }
+
+    const request = new Promise((resolve, reject) => {
+      const response = {
+        statusCode: 200,
+        body: null,
+        status(code) {
+          response.statusCode = code;
+          return response;
+        },
+        json(body) {
+          response.body = body;
+          resolve(response);
+        },
+      };
+
+      executeComparison(req, response).catch(reject);
+    }).then((result) => {
+      if (result.statusCode === 200) {
+        comparisonCache.set(key, {
+          body: result.body,
+          expiresAt: Date.now() + COMPARISON_CACHE_TTL_MS,
+        });
+      }
+      return result;
+    }).finally(() => {
+      comparisonInFlight.delete(key);
+    });
+
+    comparisonInFlight.set(key, request);
+    const result = await request;
+    return res.status(result.statusCode).json(result.body);
 });
