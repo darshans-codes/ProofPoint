@@ -15,10 +15,7 @@ function getUsableMediaUrl(asset) {
   ];
 
   return urls.find(
-    (url) =>
-      typeof url === 'string' &&
-      /^https?:\/\//i.test(url) &&
-      !url.includes('images.unsplash.com')
+    (url) => typeof url === 'string' && /^https?:\/\//i.test(url)
   );
 }
 

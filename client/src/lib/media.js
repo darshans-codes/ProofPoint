@@ -4,6 +4,6 @@ export function getEvidenceImageUrl(asset, variant = 'thumb') {
     asset?.cloudinary?.secureUrl ||
     asset?.cloudinary?.url;
 
-  if (!url || url.includes('images.unsplash.com')) return '';
+  if (!url || typeof url !== 'string') return '';
   return url;
 }

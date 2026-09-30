@@ -11,10 +11,7 @@ function hasUsableMedia(asset) {
   ];
 
   return urls.some(
-    (url) =>
-      typeof url === 'string' &&
-      /^https?:\/\//i.test(url) &&
-      !url.includes('images.unsplash.com')
+    (url) => typeof url === 'string' && /^https?:\/\//i.test(url)
   );
 }
 
