@@ -2,7 +2,7 @@ import { Asset } from '../models/Asset.js';
 import { Project } from '../models/Project.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { extractExif } from '../services/exifService.js';
-import { dHash } from '../services/hashService.js';
+import { dHash, hammingDistance } from '../services/hashService.js';
 import { uploadToCloudinary, destroyFromCloudinary, buildTransformations } from '../services/cloudinaryService.js';
 import { analyzeImage, embedText, GEMINI_UNAVAILABLE_MESSAGE } from '../services/gemini.js';
 import { verifyAsset } from '../services/verifyService.js';
@@ -42,7 +42,9 @@ export const uploadAssets = asyncHandler(async (req, res) => {
       : null;
 
   // Retrieve existing assets in project for duplicate detection
-  const existingAssets = await Asset.find({ project: projectId }).select('phash _id');
+  const existingAssets = await Asset.find({ project: projectId }).select(
+    'phash _id projectName cloudinary transformations'
+  );
 
   // Process files with max 3 concurrent items
   const createdAssets = await mapConcurrent(files, 3, async (file) => {
@@ -55,6 +57,82 @@ export const uploadAssets = asyncHandler(async (req, res) => {
 
     // 2. Perceptual dHash (for images)
     const phash = isVideo ? null : await dHash(buffer);
+
+    // Check for duplicates before any external upload or Gemini work.
+    let duplicateMatch = !isVideo && existingAssets.find(
+      (existing) => existing.phash && hammingDistance(phash, existing.phash) <= 5
+    );
+
+    // Refresh the snapshot once to reduce races with a nearby upload request.
+    if (!duplicateMatch && !isVideo && phash) {
+      const latestAssets = await Asset.find({ project: projectId }).select(
+        'phash _id projectName cloudinary transformations'
+      );
+      duplicateMatch = latestAssets.find(
+        (existing) => existing.phash && hammingDistance(phash, existing.phash) <= 5
+      );
+      if (duplicateMatch) {
+        existingAssets.push(duplicateMatch);
+      }
+    }
+
+    if (duplicateMatch) {
+      console.log(`[Duplicate] Matching asset found: ${duplicateMatch._id}`);
+      const duplicateVerification = verifyAsset(
+        {
+          exif,
+          claimedGeo,
+          capturedDate: parsedCapturedDate,
+          phash,
+          ai: null,
+        },
+        [duplicateMatch]
+      );
+      const duplicateAsset = await Asset.create({
+        project: project._id,
+        projectName: project.name,
+        locationName,
+        capturedDate: parsedCapturedDate,
+        kind,
+        cloudinary: duplicateMatch.cloudinary,
+        transformations: duplicateMatch.transformations,
+        ai: null,
+        exif,
+        claimedGeo,
+        verification: duplicateVerification,
+        phash,
+        duplicateOf: duplicateMatch._id,
+        embedding: null,
+        provenance: [
+          {
+            event: 'uploaded',
+            at: new Date(),
+            detail: `Duplicate file ${file.originalname} received; existing stored media retained.`,
+          },
+          {
+            event: 'duplicate_detected',
+            at: new Date(),
+            detail: `Perceptual dHash match detected against asset ${duplicateMatch._id}. Gemini analysis and embedding skipped.`,
+          },
+          {
+            event: 'verified',
+            at: new Date(),
+            detail: `Verification audit completed. Status assigned: ${duplicateVerification.status.toUpperCase()} (${duplicateVerification.score}/100).`,
+          },
+          {
+            event: 'transformed',
+            at: new Date(),
+            detail: 'Existing Cloudinary responsive delivery formats and watermarked evidence derivatives reused.',
+          },
+        ],
+        usedInReports: [],
+      });
+
+      existingAssets.push({ _id: duplicateAsset._id, phash });
+      const obj = duplicateAsset.toObject();
+      delete obj.embedding;
+      return obj;
+    }
 
     // 3. Upload to Cloudinary
     const uploadResult = await uploadToCloudinary(buffer, {
