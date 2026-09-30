@@ -213,17 +213,20 @@ export default function Compare() {
             <div className="border border-[#D8D2C4] bg-[#FBF9F4] p-12 text-center font-mono text-xs text-[#5F6A61]">
               READING COMPARISON RECORDS...
             </div>
-          ) : comparisonError ? (
-            <div className="border border-[#A63A2B] bg-[#F3DAD5] p-6 text-sm text-[#A63A2B]">
-              {comparisonError}
-            </div>
           ) : (
-            <CompareViewer
-              beforeAsset={selectedPair.before}
-              afterAsset={selectedPair.after}
-              distanceMeters={selectedPair.distanceMeters}
-              daysBetween={selectedPair.daysBetween}
-            />
+            <>
+              {comparisonError && (
+                <div className="border border-[#A63A2B] bg-[#F3DAD5] p-6 text-sm text-[#A63A2B]">
+                  {comparisonError}
+                </div>
+              )}
+              <CompareViewer
+                beforeAsset={selectedPair.before}
+                afterAsset={selectedPair.after}
+                distanceMeters={selectedPair.distanceMeters}
+                daysBetween={selectedPair.daysBetween}
+              />
+            </>
           )}
 
           {/* AI Estimate Analysis & Metric Table */}

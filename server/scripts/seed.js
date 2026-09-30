@@ -5,12 +5,56 @@ import { Asset } from '../src/models/Asset.js';
 import { Report } from '../src/models/Report.js';
 import { verifyAsset } from '../src/services/verifyService.js';
 import { dHash } from '../src/services/hashService.js';
-import { embedText } from '../src/services/gemini.js';
-import { buildTransformations } from '../src/services/cloudinaryService.js';
+import { analyzeImage, embedText } from '../src/services/gemini.js';
+import { buildTransformations, uploadToCloudinary } from '../src/services/cloudinaryService.js';
+import { extractExif } from '../src/services/exifService.js';
+import { readFile } from 'node:fs/promises';
 import sharp from 'sharp';
 
 // Curated public domain & CC conservation photography dataset
 const SEED_PROJECTS = [
+  {
+    name: 'Watts Branch Stream Restoration — Public Source Demo',
+    isPublicSourceDemo: true,
+    location: 'Watts Branch, Anacostia River watershed',
+    description:
+      'Public-source documentary before-and-after photographs from the U.S. Fish & Wildlife Service, included for product demonstration and clearly distinct from ProofPoint field evidence.',
+    startDate: new Date('2011-02-14'),
+    assets: [
+      {
+        localPath: '../seed-images/watts-branch-demo/before.jpg',
+        locationName: 'Watts Branch, Anacostia River watershed',
+        capturedDate: new Date('2011-02-14T00:00:00Z'),
+        sourceMetadata: {
+          type: 'public_source_demo',
+          sourceDate: new Date('2011-02-14T00:00:00Z'),
+          credit: 'Mark Secrist, U.S. Fish & Wildlife Service',
+          license: 'Public domain',
+          url: 'https://www.flickr.com/photos/usfwsnortheast/7557235384/',
+          context: 'Watts Branch, Anacostia River watershed',
+        },
+        caption: 'Public-source before photograph of Watts Branch before restoration.',
+        tags: ['public-source-demo', 'watts-branch', 'stream-restoration', 'before'],
+        activity: 'documentary before-restoration reference',
+      },
+      {
+        localPath: '../seed-images/watts-branch-demo/after.jpg',
+        locationName: 'Watts Branch, Anacostia River watershed',
+        capturedDate: new Date('2011-08-19T00:00:00Z'),
+        sourceMetadata: {
+          type: 'public_source_demo',
+          sourceDate: new Date('2011-08-19T00:00:00Z'),
+          credit: 'Mark Secrist, U.S. Fish & Wildlife Service',
+          license: 'Public domain',
+          url: 'https://www.flickr.com/photos/usfwsnortheast/7557277790/',
+          context: 'Watts Branch, Anacostia River watershed',
+        },
+        caption: 'Public-source after photograph of Watts Branch following restoration.',
+        tags: ['public-source-demo', 'watts-branch', 'stream-restoration', 'after'],
+        activity: 'documentary after-restoration reference',
+      },
+    ],
+  },
   {
     name: 'Acre River Riparian Buffer Project',
     location: 'Acre Basin, Amazonia, Brazil',
@@ -293,6 +337,106 @@ async function seedDatabase() {
     for (let i = 0; i < projectData.assets.length; i++) {
       const item = projectData.assets[i];
 
+      if (item.localPath) {
+        const buffer = await readFile(new URL(item.localPath, import.meta.url));
+        const exif = await extractExif(buffer);
+        const phash = await dHash(buffer);
+        const uploadResult = await uploadToCloudinary(buffer, {
+          folder: `proofpoint/${project.name.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          resource_type: 'image',
+          filename: item.localPath,
+        });
+        const transformations = buildTransformations(
+          uploadResult.public_id,
+          project.name,
+          'image'
+        );
+        const analysisResult = await analyzeImage(buffer, 'image/jpeg');
+        const ai =
+          analysisResult && analysisResult.ok !== false
+            ? { ...analysisResult, analyzedAt: new Date() }
+            : null;
+        const verification = verifyAsset(
+          {
+            exif,
+            capturedDate: item.capturedDate,
+            phash,
+            ai,
+          },
+          createdProjectAssets
+        );
+        const textToEmbed = [
+          item.caption,
+          ...(item.tags || []),
+          item.activity,
+          item.locationName,
+          project.name,
+        ]
+          .filter(Boolean)
+          .join(' ');
+        const embedding = await embedText(textToEmbed);
+        const asset = await Asset.create({
+          project: project._id,
+          projectName: project.name,
+          locationName: item.locationName,
+          capturedDate: item.capturedDate,
+          kind: 'image',
+          cloudinary: {
+            publicId: uploadResult.public_id,
+            url: uploadResult.url,
+            secureUrl: uploadResult.secure_url,
+            width: uploadResult.width,
+            height: uploadResult.height,
+            format: uploadResult.format,
+            bytes: uploadResult.bytes,
+            resourceType: uploadResult.resource_type || 'image',
+          },
+          transformations,
+          ai,
+          exif,
+          sourceMetadata: item.sourceMetadata,
+          verification,
+          phash,
+          embedding,
+          provenance: [
+            {
+              event: 'uploaded',
+              at: new Date(),
+              detail: `Public-source demo image ingested from ${item.sourceMetadata.url}; not original ProofPoint field evidence.`,
+            },
+            {
+              event: 'source_attributed',
+              at: item.sourceMetadata.sourceDate,
+              detail: `Source credit: ${item.sourceMetadata.credit}. License: ${item.sourceMetadata.license}. Source: ${item.sourceMetadata.url}. Context: ${item.sourceMetadata.context}.`,
+            },
+            {
+              event: ai ? 'analyzed' : 'analysis_failed',
+              at: new Date(),
+              detail: ai
+                ? 'Visual analysis completed for public-source demo data.'
+                : 'Visual analysis was unavailable; source image and verification data were retained.',
+            },
+            {
+              event: 'verified',
+              at: new Date(),
+              detail: `Verification audit completed. Status assigned: ${verification.status.toUpperCase()} (${verification.score}/100).`,
+            },
+            {
+              event: 'transformed',
+              at: new Date(),
+              detail: 'Cloudinary responsive delivery formats and watermarked evidence derivative generated.',
+            },
+          ],
+          usedInReports: [],
+        });
+
+        createdProjectAssets.push(asset);
+        console.log(
+          `  -> Ingested Public-Source Frame: PP-${asset._id.toString().slice(-4).toUpperCase()} [${verification.status.toUpperCase()} ${verification.score}/100]`
+        );
+        continue;
+      }
+
       if (item.imageUrl?.includes('images.unsplash.com')) {
         console.warn(
           `  -> Skipping legacy external seed image for ${item.locationName}; use a local field image instead.`
@@ -393,7 +537,7 @@ async function seedDatabase() {
     }
 
     // Auto-create an authoritative impact report for the project if at least 2 assets exist
-    if (createdProjectAssets.length >= 2) {
+    if (createdProjectAssets.length >= 2 && !projectData.isPublicSourceDemo) {
       const beforeAsset = createdProjectAssets[0];
       const afterAsset = createdProjectAssets[1];
 

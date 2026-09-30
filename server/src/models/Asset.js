@@ -68,6 +68,17 @@ const assetSchema = new mongoose.Schema(
       lat: Number,
       lng: Number,
     },
+    sourceMetadata: {
+      type: {
+        type: String,
+        enum: ['public_source_demo'],
+      },
+      sourceDate: Date,
+      credit: String,
+      license: String,
+      url: String,
+      context: String,
+    },
     verification: {
       status: {
         type: String,
