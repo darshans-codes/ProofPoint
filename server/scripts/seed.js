@@ -293,6 +293,13 @@ async function seedDatabase() {
     for (let i = 0; i < projectData.assets.length; i++) {
       const item = projectData.assets[i];
 
+      if (item.imageUrl?.includes('images.unsplash.com')) {
+        console.warn(
+          `  -> Skipping legacy external seed image for ${item.locationName}; use a local field image instead.`
+        );
+        continue;
+      }
+
       // Generate deterministic perceptual hash from text & index
       const simulatedHash = `${(i + 1).toString(16).repeat(8)}${(i + 7).toString(16).repeat(8)}`.slice(0, 16);
 
