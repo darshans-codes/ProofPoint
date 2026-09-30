@@ -49,23 +49,81 @@ class ConcurrencyQueue {
 
 const geminiQueue = new ConcurrencyQueue(2);
 
-// Exponential backoff helper: 1s, 2s, 4s
-async function withRetry(operation, maxRetries = 3) {
-  let delay = 1000;
+export const GEMINI_UNAVAILABLE_MESSAGE =
+  'Visual analysis temporarily unavailable. The evidence was uploaded successfully and can be re-analyzed later.';
+
+function getErrorStatus(error) {
+  const candidates = [
+    error?.status,
+    error?.statusCode,
+    error?.code,
+    error?.response?.status,
+    error?.response?.statusCode,
+    error?.error?.status,
+    error?.error?.code,
+  ];
+  const status = candidates.find((value) => /^\d{3}$/.test(String(value)));
+  return status ? Number(status) : null;
+}
+
+function getConciseReason(error) {
+  const reason = String(
+    error?.statusText ||
+    error?.response?.statusText ||
+    error?.message ||
+    'request failed'
+  )
+    .split('\n')[0]
+    .replace(/(?:key|token|api[_ -]?key)\s*[=:]\s*\S+/gi, '[redacted]')
+    .replace(/https?:\/\/\S+/gi, '[url redacted]')
+    .slice(0, 180);
+  return reason || 'request failed';
+}
+
+function isTransientError(error) {
+  const status = getErrorStatus(error);
+  return status === 408 || status === 429 || (status >= 500 && status <= 599);
+}
+
+function unavailableResult(reason, status) {
+  return {
+    ok: false,
+    code: isTransientError({ status }) ? 'GEMINI_TRANSIENT_UNAVAILABLE' : 'GEMINI_REQUEST_FAILED',
+    message: GEMINI_UNAVAILABLE_MESSAGE,
+    status: status || null,
+    reason,
+  };
+}
+
+// Bounded exponential backoff with jitter. Maximum wait is 20 seconds.
+async function withRetry(operation, maxRetries = 5) {
+  const baseDelay = 1500;
+  const maxDelay = 20000;
+  let lastError = null;
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await operation();
     } catch (error) {
-      console.warn(`[Gemini] Attempt ${attempt} failed: ${error.message}`);
-      if (attempt === maxRetries) {
-        console.error('[Gemini] All retry attempts exhausted. Returning null.');
-        return null;
+      lastError = error;
+      const status = getErrorStatus(error);
+      const reason = getConciseReason(error);
+      console.warn(`[Gemini] Attempt ${attempt}/${maxRetries} failed${status ? ` (${status})` : ''}: ${reason}`);
+
+      if (!isTransientError(error) || attempt === maxRetries) {
+        break;
       }
-      await new Promise((r) => setTimeout(r, delay));
-      delay *= 2;
+
+      const exponentialDelay = Math.min(maxDelay, baseDelay * 2 ** (attempt - 1));
+      const jitteredDelay = Math.round(exponentialDelay * (0.5 + Math.random()));
+      await new Promise((resolve) => setTimeout(resolve, jitteredDelay));
     }
   }
-  return null;
+
+  const status = getErrorStatus(lastError);
+  const reason = getConciseReason(lastError);
+  console.error(`[Gemini] Analysis unavailable${status ? ` (${status})` : ''}: ${reason}`);
+  return unavailableResult(reason, status);
 }
 
 const ANALYSIS_PROMPT = `You analyze field photos for NGO/sustainability projects. Return ONLY JSON: {"caption":string (one factual sentence),"tags":string[] (6-10 lowercase),"activity":string,"metrics":{"trees":number,"waste":"low"|"medium"|"high"|"n/a","waterClarity":"good"|"fair"|"poor"|"n/a","vegetationLevel":"low"|"medium"|"high"|"n/a","peopleCount":number}}. Be conservative; do not invent details.`;
@@ -75,7 +133,7 @@ export async function analyzeImage(buffer, mimeType = 'image/jpeg') {
     return generateFallbackAnalysis();
   }
 
-  return geminiQueue.enqueue(() =>
+  const result = await geminiQueue.enqueue(() =>
     withRetry(async () => {
       const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
       const base64Data = buffer.toString('base64');
@@ -103,9 +161,11 @@ export async function analyzeImage(buffer, mimeType = 'image/jpeg') {
       });
 
       const text = response.text?.trim() || '';
-      return JSON.parse(text);
+      const result = JSON.parse(text);
+      return { ok: true, ...result };
     })
   );
+  return result;
 }
 
 export async function embedText(text) {
@@ -114,7 +174,7 @@ export async function embedText(text) {
     return generateDeterministicEmbedding(text);
   }
 
-  return geminiQueue.enqueue(() =>
+  const result = await geminiQueue.enqueue(() =>
     withRetry(async () => {
       const model = process.env.GEMINI_EMBED_MODEL || 'gemini-embedding-001';
       const response = await ai.models.embedContent({
@@ -134,6 +194,7 @@ export async function embedText(text) {
       return null;
     })
   );
+  return result?.ok === false ? null : result;
 }
 
 export async function compareImages(beforeBuffer, afterBuffer, mimeBefore = 'image/jpeg', mimeAfter = 'image/jpeg') {
@@ -174,7 +235,7 @@ export async function compareImages(beforeBuffer, afterBuffer, mimeBefore = 'ima
         },
       });
 
-      return JSON.parse(response.text?.trim() || '{}');
+      return { ok: true, ...JSON.parse(response.text?.trim() || '{}') };
     })
   );
 }
@@ -207,7 +268,7 @@ Metrics: ${JSON.stringify(metrics || {})}`;
         },
       });
 
-      return JSON.parse(response.text?.trim() || '{}');
+      return { ok: true, ...JSON.parse(response.text?.trim() || '{}') };
     })
   );
 }

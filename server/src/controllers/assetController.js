@@ -4,7 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { extractExif } from '../services/exifService.js';
 import { dHash } from '../services/hashService.js';
 import { uploadToCloudinary, destroyFromCloudinary, buildTransformations } from '../services/cloudinaryService.js';
-import { analyzeImage, embedText } from '../services/gemini.js';
+import { analyzeImage, embedText, GEMINI_UNAVAILABLE_MESSAGE } from '../services/gemini.js';
 import { verifyAsset } from '../services/verifyService.js';
 
 // Batch helper: run array of tasks with max concurrency
@@ -73,10 +73,12 @@ export const uploadAssets = asyncHandler(async (req, res) => {
     let ai = null;
     let analysisFailed = false;
     if (!isVideo) {
-      ai = await analyzeImage(buffer, file.mimetype);
-      if (!ai) {
+      const analysisResult = await analyzeImage(buffer, file.mimetype);
+      if (analysisResult?.ok === false || !analysisResult) {
         analysisFailed = true;
       } else {
+        ai = { ...analysisResult };
+        delete ai.ok;
         ai.analyzedAt = new Date();
       }
     }
@@ -121,7 +123,7 @@ export const uploadAssets = asyncHandler(async (req, res) => {
         detail: isVideo
           ? 'Video asset; automated visual breakdown skipped.'
           : analysisFailed
-          ? 'Gemini automated visual analysis failed or timed out.'
+          ? 'Visual analysis temporarily unavailable. The evidence was uploaded successfully and can be re-analyzed later.'
           : `Visual features, factual caption, and metrics extracted via Gemini vision.`,
       },
       {
@@ -169,6 +171,14 @@ export const uploadAssets = asyncHandler(async (req, res) => {
 
     const obj = asset.toObject();
     delete obj.embedding;
+    if (analysisFailed) {
+      obj.analysis = {
+        ok: false,
+        code: 'GEMINI_TRANSIENT_UNAVAILABLE',
+        message: GEMINI_UNAVAILABLE_MESSAGE,
+        retryable: true,
+      };
+    }
     return obj;
   });
 
@@ -293,10 +303,16 @@ export const reanalyzeAsset = asyncHandler(async (req, res) => {
 
   // Re-run Gemini analysis
   const mimeType = asset.cloudinary.format ? `image/${asset.cloudinary.format}` : 'image/jpeg';
-  const ai = await analyzeImage(buffer, mimeType);
-  if (!ai) {
-    return res.status(502).json({ error: 'Gemini visual analysis failed during re-analysis.' });
+  const analysisResult = await analyzeImage(buffer, mimeType);
+  if (analysisResult?.ok === false || !analysisResult) {
+    return res.status(503).json({
+      error: analysisResult?.message || GEMINI_UNAVAILABLE_MESSAGE,
+      code: analysisResult?.code || 'GEMINI_ANALYSIS_UNAVAILABLE',
+      retryable: true,
+    });
   }
+  const ai = { ...analysisResult };
+  delete ai.ok;
   ai.analyzedAt = new Date();
 
   // Re-embed
