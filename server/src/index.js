@@ -8,6 +8,7 @@ import searchRoutes from './routes/searchRoutes.js';
 import pairRoutes from './routes/pairRoutes.js';
 import compareRoutes from './routes/compareRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -17,11 +18,11 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, postman) or matching CLIENT_URL or localhost
-      if (!origin || origin.startsWith('http://localhost') || origin === CLIENT_URL) {
+      const allowedOrigins = [CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174'];
+      if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(null, true); // Dev-friendly permissive CORS
+        callback(new Error('Origin is not allowed by ProofPoint CORS policy.'));
       }
     },
     credentials: true,
@@ -56,6 +57,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/pairs', pairRoutes);
 app.use('/api/compare', compareRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/auth', authRoutes);
 
 // 404 Handler
 app.use((req, res) => {

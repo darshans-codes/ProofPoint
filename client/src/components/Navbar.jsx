@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { useProject } from '../context/ProjectContext';
-import { UploadCloud, Menu, X, ArrowUpRight, ShieldCheck } from 'lucide-react';
+import { UploadCloud, Menu, X, LogOut } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const NAV_ITEMS = [
   { label: 'Overview', path: '/app' },
@@ -15,6 +16,7 @@ const NAV_ITEMS = [
 
 export default function Navbar() {
   const { projects, selectedProjectId, setSelectedProjectId } = useProject();
+  const { user, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -93,6 +95,22 @@ export default function Navbar() {
             <UploadCloud className="w-3.5 h-3.5" />
             <span>Intake Evidence</span>
           </Link>
+          <div className="flex items-center gap-2 pl-3 border-l border-[#D8D2C4]">
+            {user?.picture ? (
+              <img src={user.picture} alt="" className="w-6 h-6 rounded-full" />
+            ) : null}
+            <span className="max-w-28 truncate text-xs text-[#5F6A61]" title={user?.name}>
+              {user?.name}
+            </span>
+            <button
+              onClick={signOut}
+              className="p-1.5 text-[#5F6A61] hover:text-[#1B221D] transition-colors"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Mobile menu trigger */}
@@ -141,6 +159,12 @@ export default function Navbar() {
           </div>
 
           <div className="pt-3 border-t border-[#D8D2C4] flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[#5F6A61] truncate">{user?.name}</span>
+              <button onClick={signOut} className="inline-flex items-center gap-1 text-xs font-mono uppercase text-[#5F6A61]" aria-label="Sign out">
+                <LogOut className="w-3.5 h-3.5" /> Sign out
+              </button>
+            </div>
             <span className="text-xs font-mono text-[#5F6A61] uppercase tracking-wider">
               PROJECT CONTEXT:
             </span>

@@ -177,13 +177,13 @@ export default function Landing() {
 
           <div className="flex items-center gap-4">
             <Link
-              to="/app"
+              to="/login"
               className="hidden sm:inline text-xs font-mono uppercase tracking-wider text-[#1B221D] hover:text-[#2F5D46] transition-colors"
             >
               Sign In
             </Link>
             <Link
-              to="/app"
+              to="/login"
               className="inline-flex items-center gap-1.5 bg-[#2F5D46] hover:bg-[#244A38] text-[#FBF9F4] text-xs font-medium px-4 py-2 rounded-[2px] transition-colors"
             >
               <span>Open the platform</span>
@@ -218,7 +218,7 @@ export default function Landing() {
 
             <div className="flex flex-wrap items-center gap-4">
               <Link
-                to="/app"
+                to="/login"
                 className="inline-flex items-center gap-2 bg-[#2F5D46] hover:bg-[#244A38] text-[#FBF9F4] text-sm font-medium px-6 py-3 rounded-[2px] transition-colors shadow-none"
               >
                 <span>Open the platform</span>
@@ -482,7 +482,7 @@ export default function Landing() {
           </p>
           <div className="flex justify-center gap-4">
             <Link
-              to="/app"
+              to="/login"
               className="inline-flex items-center gap-2 bg-[#2F5D46] hover:bg-[#244A38] text-[#FBF9F4] text-sm font-medium px-8 py-3 rounded-[2px] transition-colors"
             >
               <span>Open the platform</span>

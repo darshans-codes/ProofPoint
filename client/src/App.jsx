@@ -15,17 +15,23 @@ import MapPage from './pages/Map';
 import Reports from './pages/Reports';
 import Story from './pages/Story';
 import NotFound from './pages/NotFound';
+import Login from './pages/Login';
+import ProtectedRoute from './components/ProtectedRoute';
+import { AuthProvider } from './context/AuthContext';
 
 export default function App() {
   return (
-    <ProjectProvider>
-      <BrowserRouter>
-        <Routes>
+    <AuthProvider>
+      <ProjectProvider>
+        <BrowserRouter>
+          <Routes>
           {/* Public Landing Showcase */}
           <Route path="/" element={<Landing />} />
 
           {/* App Core Views under Layout */}
-          <Route path="/app" element={<Layout />}>
+          <Route path="/login" element={<Login />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/app" element={<Layout />}>
             <Route index element={<Overview />} />
             <Route path="upload" element={<Upload />} />
             <Route path="gallery" element={<Gallery />} />
@@ -35,6 +41,7 @@ export default function App() {
             <Route path="map" element={<MapPage />} />
             <Route path="reports" element={<Reports />} />
             <Route path="*" element={<NotFound />} />
+            </Route>
           </Route>
 
           {/* Public Shareable Impact Story (Standalone Editorial Canvas) */}
@@ -42,8 +49,9 @@ export default function App() {
 
           {/* Fallback 404 */}
           <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </ProjectProvider>
+          </Routes>
+        </BrowserRouter>
+      </ProjectProvider>
+    </AuthProvider>
   );
 }

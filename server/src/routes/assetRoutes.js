@@ -7,6 +7,7 @@ import {
   deleteAsset,
   reanalyzeAsset,
 } from '../controllers/assetController.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -26,10 +27,10 @@ const upload = multer({
 
 const router = Router();
 
-router.post('/', upload.array('files', 15), uploadAssets);
+router.post('/', requireAuth, upload.array('files', 15), uploadAssets);
 router.get('/', getAssets);
 router.get('/:id', getAssetById);
-router.delete('/:id', deleteAsset);
-router.post('/:id/reanalyze', reanalyzeAsset);
+router.delete('/:id', requireAuth, deleteAsset);
+router.post('/:id/reanalyze', requireAuth, reanalyzeAsset);
 
 export default router;
