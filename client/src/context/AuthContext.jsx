@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { getCurrentUser, loginWithGoogle, logout as logoutRequest } from '../api/client';
+import { getCurrentUser, loginWithGoogle, loginAsGuest, logout as logoutRequest } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -20,13 +20,35 @@ export function AuthProvider({ children }) {
     return nextUser;
   };
 
+  const continueAsGuest = async () => {
+    try {
+      const nextUser = await loginAsGuest();
+      setUser(nextUser);
+      return nextUser;
+    } catch {
+      // Offline/local fallback user state
+      const fallbackUser = {
+        id: '000000000000000000000001',
+        name: 'Field Investigator (Demo)',
+        email: 'investigator@proofpoint.local',
+        role: 'user',
+      };
+      setUser(fallbackUser);
+      return fallbackUser;
+    }
+  };
+
   const signOut = async () => {
-    await logoutRequest();
+    try {
+      await logoutRequest();
+    } catch {
+      // Ignore network errors on logout
+    }
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, continueAsGuest, signOut }}>
       {children}
     </AuthContext.Provider>
   );

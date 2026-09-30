@@ -64,9 +64,54 @@ export const loginWithGoogle = asyncHandler(async (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
+export const loginAsGuest = asyncHandler(async (req, res) => {
+  let user;
+  try {
+    user = await User.findOneAndUpdate(
+      { googleSub: 'demo-guest-user-sub' },
+      {
+        $set: {
+          email: 'investigator@proofpoint.local',
+          name: 'Field Investigator (Demo)',
+          picture: '',
+          lastLoginAt: new Date(),
+        },
+        $setOnInsert: { role: 'user' },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+  } catch {
+    // Resilient fallback when Mongo is running in degraded mode
+    user = {
+      _id: '000000000000000000000001',
+      email: 'investigator@proofpoint.local',
+      name: 'Field Investigator (Demo)',
+      picture: '',
+      role: 'user',
+    };
+  }
+
+  setSessionCookie(res, signSession(user));
+  res.json({ user: publicUser(user) });
+});
+
 export const getMe = asyncHandler(async (req, res) => {
   if (!req.auth?.sub) return res.json({ user: null });
-  const user = await User.findById(req.auth.sub).select('_id email name picture role');
+  let user = null;
+  try {
+    user = await User.findById(req.auth.sub).select('_id email name picture role');
+  } catch {
+    // Ignore db find error on mock sub
+  }
+  if (!user && (req.auth.sub === '000000000000000000000001' || req.auth.sub === 'demo_user')) {
+    user = {
+      _id: req.auth.sub,
+      email: 'investigator@proofpoint.local',
+      name: 'Field Investigator (Demo)',
+      picture: '',
+      role: req.auth.role || 'user',
+    };
+  }
   if (!user) return res.json({ user: null });
   res.json({ user: publicUser(user) });
 });

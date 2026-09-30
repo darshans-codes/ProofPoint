@@ -15,7 +15,7 @@ import authRoutes from './routes/authRoutes.js';
 import { requireTrustedOrigin } from './middleware/security.js';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -97,16 +97,12 @@ app.use((err, req, res, next) => {
 async function startServer() {
   try {
     await connectDB();
-    app.listen(PORT, () => {
-      console.log(`[ProofPoint Server] Running on http://localhost:${PORT}`);
-    });
   } catch (error) {
     console.error('[ProofPoint Server] Failed to connect database:', error.message);
-    // Still start server so /api/health and other non-db calls can report status
-    app.listen(PORT, () => {
-      console.log(`[ProofPoint Server] Running in degraded mode on http://localhost:${PORT}`);
-    });
   }
+  app.listen(PORT, () => {
+    console.log(`[ProofPoint Server] Running on http://localhost:${PORT}`);
+  });
 }
 
 startServer();

@@ -1,13 +1,18 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
   timeout: 30000,
   withCredentials: true,
 });
 
 export const loginWithGoogle = async (credential) => {
   const { data } = await api.post('/auth/google', { credential });
+  return data.user;
+};
+
+export const loginAsGuest = async () => {
+  const { data } = await api.post('/auth/guest');
   return data.user;
 };
 

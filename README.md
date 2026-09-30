@@ -68,7 +68,7 @@ npm run server
 npm run client
 ```
 
-The frontend runs on Vite's selected local port, normally `5173`; the API runs on `http://localhost:5000`.
+The frontend runs on Vite's selected local port, normally `5173`; the API runs on `http://localhost:5001`.
 
 ## Demo data
 

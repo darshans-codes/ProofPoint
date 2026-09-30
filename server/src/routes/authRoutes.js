@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getMe, loginWithGoogle, logout } from '../controllers/authController.js';
+import { getMe, loginWithGoogle, loginAsGuest, logout } from '../controllers/authController.js';
 import { optionalAuth } from '../middleware/auth.js';
 import rateLimit from 'express-rate-limit';
 
@@ -14,6 +14,8 @@ const authLimiter = rateLimit({
 const router = Router();
 
 router.post('/google', authLimiter, loginWithGoogle);
+router.post('/guest', loginAsGuest);
+router.post('/demo', loginAsGuest);
 router.get('/me', optionalAuth, getMe);
 router.post('/logout', logout);
 

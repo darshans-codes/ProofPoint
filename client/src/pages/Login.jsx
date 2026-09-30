@@ -4,17 +4,31 @@ import { ArrowRight, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
-  const { user, loading, signIn } = useAuth();
+  const { user, loading, signIn, continueAsGuest } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const buttonRef = useRef(null);
   const [error, setError] = useState('');
+  const [guestLoading, setGuestLoading] = useState(false);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const destination = location.state?.from?.pathname || '/app';
 
   useEffect(() => {
     if (user) navigate(destination, { replace: true });
   }, [destination, navigate, user]);
+
+  const handleGuestLogin = async () => {
+    try {
+      setError('');
+      setGuestLoading(true);
+      await continueAsGuest();
+      navigate(destination, { replace: true });
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not initialize guest session.');
+    } finally {
+      setGuestLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!clientId || user) return undefined;
@@ -86,16 +100,51 @@ export default function Login() {
           <Link to="/" className="lg:hidden font-serif text-3xl font-semibold">ProofPoint</Link>
           <div className="mt-16 lg:mt-0 border-t border-[#D8D2C4] pt-8">
             <p className="font-mono text-[11px] tracking-[0.2em] uppercase text-[#5F6A61]">Access platform</p>
-            <h2 className="font-serif text-4xl mt-3">Continue with Google</h2>
-            <p className="text-sm text-[#5F6A61] mt-4">Use your Google account to enter the evidence platform.</p>
+            <h2 className="font-serif text-4xl mt-3">Sign in to ProofPoint</h2>
+            <p className="text-sm text-[#5F6A61] mt-3">
+              Explore the evidence ledger, upload imagery, and review impact stories.
+            </p>
+
+            {/* Quick Demo Access Bypass Button */}
+            <div className="mt-8">
+              <button
+                type="button"
+                onClick={handleGuestLogin}
+                disabled={guestLoading}
+                className="w-full py-3.5 px-5 bg-[#2F5D46] hover:bg-[#244A38] text-white font-mono text-xs uppercase tracking-wider font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50 shadow-sm"
+              >
+                {guestLoading ? (
+                  <span>Entering Workspace...</span>
+                ) : (
+                  <>
+                    <span>Enter as Guest / Demo Mode</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+              <p className="font-mono text-[11px] text-[#5F6A61] text-center mt-2">
+                Instant access • No credentials required
+              </p>
+            </div>
+
+            <div className="relative my-8 flex items-center justify-center">
+              <div className="border-t border-[#D8D2C4] w-full" />
+              <span className="bg-[#F5F2EB] px-3 text-xs font-mono uppercase tracking-wider text-[#5F6A61] absolute">
+                Or Google Account
+              </span>
+            </div>
+
+            {/* Google OAuth Section */}
             {!clientId ? (
-              <div className="mt-8 border border-[#D8D2C4] bg-[#FBF9F4] p-4 text-sm text-[#5F6A61]">
-                Google sign-in is not configured yet. Add <code className="font-mono text-xs">VITE_GOOGLE_CLIENT_ID</code> to the client environment, using a Google OAuth Web Application client ID authorized for <code className="font-mono text-xs">http://localhost:5173</code>.
+              <div className="border border-[#D8D2C4] bg-[#FBF9F4] p-4 text-xs text-[#5F6A61] leading-relaxed">
+                Google sign-in is optional. To enable OAuth, add <code className="font-mono text-[11px] bg-[#EDE8DC] px-1 py-0.5">VITE_GOOGLE_CLIENT_ID</code> to client environment.
               </div>
             ) : (
-              <div ref={buttonRef} className="mt-8 min-h-10" aria-label="Continue with Google" />
+              <div ref={buttonRef} className="min-h-10 flex justify-center" aria-label="Continue with Google" />
             )}
+
             {error && <p role="alert" className="mt-4 text-sm text-[#A63A2B]">{error}</p>}
+
             <Link to="/" className="inline-flex items-center gap-2 mt-10 text-xs font-mono uppercase tracking-wider text-[#5F6A61] hover:text-[#1B221D]">
               Return to public landing <ArrowRight className="w-3.5 h-3.5" />
             </Link>
