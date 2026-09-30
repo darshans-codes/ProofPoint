@@ -324,6 +324,13 @@ async function seedDatabase() {
   console.log('[Seed] Ingesting curated environmental restoration datasets...');
 
   for (const projectData of SEED_PROJECTS) {
+    if (!projectData.isPublicSourceDemo) {
+      console.warn(
+        `[Seed] Skipping legacy synthetic project "${projectData.name}"; no approved local evidence is configured.`
+      );
+      continue;
+    }
+
     const project = await Project.create({
       name: projectData.name,
       location: projectData.location,
