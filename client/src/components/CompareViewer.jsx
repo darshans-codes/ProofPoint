@@ -73,7 +73,7 @@ export default function CompareViewer({
             }}
           />
         }
-        className="w-full aspect-[16/10] max-h-[600px]"
+        className="w-full aspect-[16/10] max-h-[600px] cursor-col-resize"
       />
 
       {/* Before Tag (Top Left) */}

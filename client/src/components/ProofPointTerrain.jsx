@@ -1,5 +1,5 @@
 import React, { useRef, useState, Suspense } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -30,10 +30,14 @@ function latLngToVector3(lat, lng, radius = 2.4) {
 
 function GlobeWireframe({ radius = 2.4, locations = [], reducedMotion = false }) {
   const meshRef = useRef();
+  const { camera, pointer } = useThree();
 
   useFrame((_, delta) => {
     if (meshRef.current && !reducedMotion) {
       meshRef.current.rotation.y += delta * 0.025;
+      camera.position.x += (pointer.x * 0.16 - camera.position.x) * 0.025;
+      camera.position.y += ((1.2 + pointer.y * 0.08) - camera.position.y) * 0.025;
+      camera.lookAt(0, 0, 0);
     }
   });
 

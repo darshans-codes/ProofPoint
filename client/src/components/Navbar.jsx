@@ -47,16 +47,19 @@ export default function Navbar() {
                 <NavLink
                   key={item.path}
                   to={item.path}
-                  className={`relative px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`group relative px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
                       ? 'text-[#1B221D] font-semibold'
                       : 'text-[#5F6A61] hover:text-[#1B221D]'
                   }`}
                 >
                   {item.label}
-                  {isActive && (
-                    <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-[#1B221D]" />
-                  )}
+                  <span
+                    aria-hidden="true"
+                    className={`absolute bottom-0 left-3 right-3 h-[2px] origin-left bg-[#1B221D] transition-transform duration-300 ${
+                      isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                    }`}
+                  />
                 </NavLink>
               );
             })}

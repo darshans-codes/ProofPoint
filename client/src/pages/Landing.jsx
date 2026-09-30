@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion, useMotionValueEvent, useScroll, useSpring, useTransform } from 'motion/react';
 import ProofPointTerrain from '../components/ProofPointTerrain';
 import CompareViewer from '../components/CompareViewer';
+import EvidenceImage from '../components/EvidenceImage';
 import VerificationStamp from '../components/VerificationStamp';
 import AiEstimateTag from '../components/AiEstimateTag';
 import Footer from '../components/Footer';
@@ -108,8 +109,16 @@ const TRANSFORMATION_STEPS = [
 
 export default function Landing() {
   const reduceMotion = useReducedMotion();
+  const storyRef = useRef(null);
   const [activeStep, setActiveStep] = useState(0);
   const [landingData, setLandingData] = useState({ assets: [], pairs: [], projects: [], error: null });
+  const { scrollYProgress: storyScroll } = useScroll({
+    target: storyRef,
+    offset: ['start start', 'end end'],
+  });
+  const storyScale = useSpring(useTransform(storyScroll, [0, 1], [1, 1.045]), { stiffness: 90, damping: 24 });
+  const storyX = useSpring(useTransform(storyScroll, [0, 1], ['0%', '-4%']), { stiffness: 90, damping: 24 });
+  const storyRule = useTransform(storyScroll, [0, 1], ['0%', '100%']);
 
   useEffect(() => {
     let active = true;
@@ -124,6 +133,11 @@ export default function Landing() {
       active = false;
     };
   }, []);
+
+  useMotionValueEvent(storyScroll, 'change', (value) => {
+    if (reduceMotion) return;
+    setActiveStep(Math.min(3, Math.floor(value * 4.01)));
+  });
 
   const locations = landingData.projects
     .map((project) => {
@@ -164,7 +178,7 @@ export default function Landing() {
           <div className="flex items-center gap-4">
             <Link
               to="/app"
-              className="text-xs font-mono uppercase tracking-wider text-[#1B221D] hover:text-[#2F5D46] transition-colors"
+              className="hidden sm:inline text-xs font-mono uppercase tracking-wider text-[#1B221D] hover:text-[#2F5D46] transition-colors"
             >
               Sign In
             </Link>
@@ -244,7 +258,7 @@ export default function Landing() {
       </section>
 
       {/* SECTION 2 — EVIDENCE TRANSFORMATION (Scroll-driven narrative) */}
-      <section className="w-full border-b border-[#D8D2C4] py-20 bg-[#FBF9F4]">
+      <section ref={storyRef} className="w-full border-b border-[#D8D2C4] py-20 bg-[#FBF9F4]">
         <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 border-b border-[#D8D2C4] pb-6">
             <div>
@@ -261,40 +275,67 @@ export default function Landing() {
           </div>
 
           {/* 4 Interactive Transformation Stages */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {TRANSFORMATION_STEPS.map((t, idx) => (
-              <div
-                key={idx}
-                onClick={() => setActiveStep(idx)}
-                className={`p-6 border rounded-[2px] transition-all cursor-pointer flex flex-col justify-between h-[320px] ${
-                  activeStep === idx
-                    ? 'border-[#2F5D46] bg-[#F5F2EB] ring-1 ring-[#2F5D46]'
-                    : 'border-[#D8D2C4] bg-[#FBF9F4] hover:border-[#1B221D]'
-                }`}
-              >
-                <div>
-                  <span className="font-mono text-xs uppercase tracking-wider text-[#5F6A61] block mb-1">
-                    {t.step}
-                  </span>
-                  <h3 className="font-serif text-xl font-semibold text-[#1B221D] mb-3">
-                    {t.title}
-                  </h3>
-                  <p className="text-xs font-sans text-[#5F6A61] leading-relaxed">
-                    {t.desc}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
+            <div className="lg:col-span-5 lg:sticky lg:top-24 lg:self-start">
+              <div className="relative aspect-[4/3] overflow-hidden border border-[#D8D2C4] bg-[#1B221D]">
+                {selectedPair?.before && (
+                  <motion.div
+                    className="absolute inset-0"
+                    style={reduceMotion ? undefined : { scale: storyScale, x: storyX }}
+                  >
+                    <EvidenceImage
+                      asset={selectedPair.before}
+                      alt="Baseline field evidence"
+                      className="h-full w-full object-cover opacity-80"
+                    />
+                  </motion.div>
+                )}
+                <div className="absolute inset-0 bg-[#1B221D]/25" />
+                <div className="absolute left-4 right-4 top-4 flex items-center justify-between text-[10px] font-mono text-[#F5F2EB]">
+                  <span>FIELD RECORD / SEQUENCE</span>
+                  <span>0{activeStep + 1} / 04</span>
+                </div>
+                <div className="absolute bottom-4 left-4 right-4">
+                  <div className="mb-3 h-px bg-[#F5F2EB]/40">
+                    <motion.div className="h-px bg-[#F5F2EB]" style={{ width: reduceMotion ? '0%' : storyRule }} />
+                  </div>
+                  <p className="max-w-sm font-serif text-2xl leading-tight text-[#F5F2EB]">
+                    {TRANSFORMATION_STEPS[activeStep].title}
                   </p>
                 </div>
-
-                {/* Micro preview container */}
-                <div className="border border-[#D8D2C4] bg-[#FBF9F4] p-3 rounded-[2px] mt-4 font-mono text-[10px]">
-                  <div className="text-[#1B221D] font-semibold truncate">
-                    {t.preview.title}
-                  </div>
-                  <div className="text-[#5F6A61] truncate mt-0.5">
-                    {t.preview.meta}
+              </div>
+            </div>
+            <div className="lg:col-span-7">
+            {TRANSFORMATION_STEPS.map((t, idx) => (
+              <button
+                type="button"
+                key={idx}
+                onClick={() => setActiveStep(idx)}
+                className={`group block w-full border-b border-[#D8D2C4] py-8 text-left transition-colors first:border-t ${
+                  activeStep === idx ? 'bg-[#F5F2EB]' : 'hover:bg-[#F5F2EB]/60'
+                }`}
+              >
+                <div className="grid grid-cols-[56px_1fr] gap-4 px-4 sm:px-6">
+                  <span className={`font-mono text-xs tracking-wider transition-colors ${activeStep === idx ? 'text-[#2F5D46]' : 'text-[#5F6A61]'}`}>
+                    {t.step.split(' / ')[0]}
+                  </span>
+                  <div>
+                    <div className="flex items-baseline justify-between gap-4">
+                      <h3 className="font-serif text-2xl text-[#1B221D]">{t.title}</h3>
+                      <ChevronRight className={`h-4 w-4 shrink-0 transition-transform duration-300 ${activeStep === idx ? 'translate-x-1 text-[#2F5D46]' : 'text-[#8E9890]'}`} />
+                    </div>
+                    <p className={`mt-3 max-w-xl text-sm leading-relaxed transition-colors ${activeStep === idx ? 'text-[#1B221D]' : 'text-[#5F6A61]'}`}>
+                      {t.desc}
+                    </p>
+                    <div className={`mt-4 overflow-hidden font-mono text-[10px] transition-[max-height,opacity] duration-300 ${activeStep === idx ? 'max-h-16 opacity-100' : 'max-h-0 opacity-0'}`}>
+                      <span className="font-semibold text-[#1B221D]">{t.preview.title}</span>
+                      <span className="ml-3 text-[#5F6A61]">{t.preview.meta}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
+            </div>
           </div>
         </div>
       </section>

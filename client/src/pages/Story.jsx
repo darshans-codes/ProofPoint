@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import React, { useRef, useState, useEffect } from 'react';
+import { motion, useReducedMotion, useScroll, useSpring, useTransform } from 'motion/react';
 import { useParams, Link } from 'react-router-dom';
 import { getReportBySlug } from '../api/client';
 import CompareViewer from '../components/CompareViewer';
@@ -16,6 +16,12 @@ export default function Story() {
   const [copiedCaption, setCopiedCaption] = useState(false);
   const [copyError, setCopyError] = useState('');
   const reducedMotion = useReducedMotion();
+  const storyFrameRef = useRef(null);
+  const { scrollYProgress: storyProgress } = useScroll({
+    target: storyFrameRef,
+    offset: ['start end', 'end start'],
+  });
+  const heroY = useSpring(useTransform(storyProgress, [0, 1], ['-3%', '3%']), { stiffness: 70, damping: 22 });
 
   useEffect(() => {
     async function loadStory() {
@@ -144,7 +150,7 @@ export default function Story() {
       </header>
 
       {/* Main Editorial Story Document Container */}
-      <div className="max-w-[960px] mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-16">
+      <div ref={storyFrameRef} className="max-w-[960px] mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-16">
         {/* Dateline & Document Header */}
         <motion.div
           className="space-y-4 text-center sm:text-left"
@@ -185,12 +191,14 @@ export default function Story() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: reducedMotion ? 0 : 0.08, ease: 'easeOut' }}
         >
-          <EvidenceImage
-            asset={heroImage}
-            variant="medium"
-            alt={report.title}
-            className="w-full h-full object-cover"
-          />
+          <motion.div className="h-full w-full" style={reducedMotion ? undefined : { y: heroY, scale: 1.04 }}>
+            <EvidenceImage
+              asset={heroImage}
+              variant="medium"
+              alt={report.title}
+              className="w-full h-full object-cover"
+            />
+          </motion.div>
           <div className="absolute bottom-3 left-3 bg-[#1B221D] text-[#F5F2EB] text-[10px] font-mono px-2 py-1 rounded-[1px]">
             {report.assetIds?.[0]?.sourceMetadata?.type === 'public_source_demo'
               ? 'PUBLIC-SOURCE DEMO • '
@@ -200,7 +208,13 @@ export default function Story() {
         </motion.div>
 
         {/* Key Figures Strip */}
-        <div className="grid grid-cols-2 md:grid-cols-4 border-y border-[#D8D2C4] py-8 gap-6 text-center sm:text-left divide-y sm:divide-y-0 sm:divide-x divide-[#D8D2C4]">
+        <motion.div
+          className="grid grid-cols-2 md:grid-cols-4 border-y border-[#D8D2C4] py-8 gap-6 text-center sm:text-left divide-y sm:divide-y-0 sm:divide-x divide-[#D8D2C4]"
+          initial={reducedMotion ? false : { opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.35 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        >
           <div className="px-4">
             <span className="text-[10px] font-mono text-[#5F6A61] uppercase tracking-wider block mb-1">
               VERIFIED RATE
@@ -248,17 +262,23 @@ export default function Story() {
               COMPLIANT FOR GRANTS
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Factual Narrative Arc */}
-        <div className="max-w-[700px] mx-auto space-y-6">
+        <motion.div
+          className="max-w-[700px] mx-auto space-y-6"
+          initial={reducedMotion ? false : { opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        >
           <span className="text-xs font-mono uppercase tracking-widest text-[#2F5D46] block">
             EVIDENTIARY NARRATIVE
           </span>
           <div className="font-serif text-xl sm:text-2xl text-[#1B221D] leading-relaxed space-y-4">
             <p>{report.narrative}</p>
           </div>
-        </div>
+        </motion.div>
 
         {/* Before / After Slider Section (if linked) */}
         {report.beforeAssetId && report.afterAssetId && (

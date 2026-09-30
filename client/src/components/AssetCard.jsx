@@ -19,7 +19,7 @@ export default function AssetCard({
 
   const cardContent = (
     <div
-      className={`group relative flex flex-col bg-[#FBF9F4] border transition-all duration-200 ${
+      className={`group relative flex flex-col bg-[#FBF9F4] border transition-[border-color,background-color] duration-300 ${
         selected
           ? 'border-[#2F5D46] ring-1 ring-[#2F5D46]'
           : 'border-[#D8D2C4] hover:border-[#1B221D]'
@@ -57,7 +57,7 @@ export default function AssetCard({
       </div>
 
       {/* Metadata strip */}
-      <div className="p-3 flex flex-col gap-1.5 border-t border-[#D8D2C4]">
+      <div className="p-3 flex flex-col gap-1.5 border-t border-[#D8D2C4] transition-transform duration-300 group-hover:translate-y-[-2px]">
         <div className="flex items-center justify-between text-[11px] font-mono text-[#5F6A61]">
           <span className="font-semibold text-[#1B221D]">{frameId}</span>
           <span>{dateStr}</span>
@@ -69,7 +69,7 @@ export default function AssetCard({
         </p>
 
         {/* Bottom strip: Location & Verification Stamp */}
-        <div className="pt-1 mt-auto flex items-center justify-between gap-2 border-t border-[#D8D2C4]/50">
+        <div className="pt-1 mt-auto flex items-center justify-between gap-2 border-t border-[#D8D2C4]/50 transition-colors duration-300 group-hover:border-[#2F5D46]/50">
           <span
             className="text-[11px] font-mono text-[#5F6A61] truncate max-w-[130px]"
             title={asset.locationName}
