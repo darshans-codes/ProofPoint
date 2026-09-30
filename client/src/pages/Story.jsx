@@ -195,7 +195,7 @@ export default function Story() {
             </span>
           </div>
           {sourceAttribution && (
-            <p className="max-w-2xl text-xs font-mono text-[#5F6A61]">
+            <p className="max-w-2xl break-all text-xs font-mono text-[#5F6A61]">
               PUBLIC SOURCE: {sourceAttribution.credit} · {sourceAttribution.license} · {sourceAttribution.url}
             </p>
           )}
