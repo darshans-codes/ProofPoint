@@ -7,6 +7,7 @@ import VerificationStamp from '../components/VerificationStamp';
 import AiEstimateTag from '../components/AiEstimateTag';
 import Ledger from '../components/Ledger';
 import EvidenceImage from '../components/EvidenceImage';
+import { getEvidenceImageUrl } from '../lib/media';
 import { ArrowRight, FilePlus, Sparkles, CheckCircle2, RefreshCw } from 'lucide-react';
 
 export default function Compare() {
@@ -49,6 +50,17 @@ export default function Compare() {
     if (!selectedPair?.before?._id || !selectedPair?.after?._id) return;
 
     async function runComparison() {
+      const hasMedia =
+        getEvidenceImageUrl(selectedPair.before, 'medium') &&
+        getEvidenceImageUrl(selectedPair.after, 'medium');
+
+      setComparisonData(null);
+      if (!hasMedia) {
+        setComparisonError('');
+        setLoadingCompare(false);
+        return;
+      }
+
       setLoadingCompare(true);
       setComparisonError('');
       try {
@@ -223,7 +235,7 @@ export default function Compare() {
                   <span className="text-[10px] font-mono uppercase tracking-wider text-[#5F6A61]">
                     FACTUAL OBSERVATION SUMMARY
                   </span>
-                  <AiEstimateTag />
+                  {comparisonData?.comparison?.summary && <AiEstimateTag />}
                 </div>
                 <p className="text-sm font-sans text-[#1B221D] leading-relaxed">
                   {loadingCompare
@@ -233,7 +245,7 @@ export default function Compare() {
                 <div className="text-[10px] font-mono text-[#5F6A61]">
                   CONFIDENCE RATING:{' '}
                   <span className="uppercase font-semibold text-[#2F6B4A]">
-                    {comparisonData?.comparison?.confidence || 'PENDING'}
+                    {comparisonData?.comparison?.confidence || 'UNAVAILABLE'}
                   </span>
                 </div>
               </div>
@@ -253,7 +265,7 @@ export default function Compare() {
                 <span className="text-[10px] font-mono uppercase tracking-wider text-[#5F6A61]">
                   STRUCTURED METRICS DELTA
                 </span>
-                <AiEstimateTag />
+                {comparisonData?.metricsSummary?.length > 0 && <AiEstimateTag />}
               </div>
 
               <div className="divide-y divide-[#D8D2C4] text-xs font-mono">
@@ -278,6 +290,11 @@ export default function Compare() {
                     </span>
                   </div>
                 ))}
+                {!comparisonData?.metricsSummary?.length && (
+                  <p className="py-4 text-sm text-[#5F6A61]">
+                    No analysis is available for this pair.
+                  </p>
+                )}
               </div>
 
               <div className="pt-4 border-t border-[#D8D2C4]">

@@ -2,6 +2,22 @@ import { Asset } from '../models/Asset.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { compareImages } from '../services/gemini.js';
 
+function getUsableMediaUrl(asset) {
+  const urls = [
+    asset?.transformations?.medium,
+    asset?.transformations?.watermarked,
+    asset?.cloudinary?.secureUrl,
+    asset?.cloudinary?.url,
+  ];
+
+  return urls.find(
+    (url) =>
+      typeof url === 'string' &&
+      /^https?:\/\//i.test(url) &&
+      !url.includes('images.unsplash.com')
+  );
+}
+
 export const compareAssets = asyncHandler(async (req, res) => {
   const { beforeId, afterId } = req.body;
 
@@ -18,12 +34,14 @@ export const compareAssets = asyncHandler(async (req, res) => {
     return res.status(404).json({ error: 'One or both assets could not be found.' });
   }
 
-  // Fetch both images
+  const beforeUrl = getUsableMediaUrl(beforeAsset);
+  const afterUrl = getUsableMediaUrl(afterAsset);
   let comparisonResult = null;
-  try {
+  if (beforeUrl && afterUrl) {
+    try {
     const [resBefore, resAfter] = await Promise.all([
-      fetch(beforeAsset.cloudinary.secureUrl),
-      fetch(afterAsset.cloudinary.secureUrl),
+      fetch(beforeUrl),
+      fetch(afterUrl),
     ]);
 
     if (resBefore.ok && resAfter.ok) {
@@ -34,34 +52,13 @@ export const compareAssets = asyncHandler(async (req, res) => {
 
       comparisonResult = await compareImages(bufBefore, bufAfter, mimeBefore, mimeAfter);
     }
-  } catch (err) {
-    console.warn('[Compare] Vision comparison warning:', err.message);
+    } catch (err) {
+      console.warn('[Compare] Vision comparison warning:', err.message);
+    }
   }
 
-  if (!comparisonResult) {
-    // Generate structured comparison from stored metrics if external fetch failed
-    comparisonResult = {
-      summary: `Baseline comparison conducted between observation on ${new Date(
-        beforeAsset.capturedDate
-      ).toLocaleDateString()} and follow-up on ${new Date(
-        afterAsset.capturedDate
-      ).toLocaleDateString()} at ${beforeAsset.locationName}.`,
-      changes: [
-        {
-          aspect: 'Ground Vegetation',
-          before: beforeAsset.ai?.metrics?.vegetationLevel || 'baseline',
-          after: afterAsset.ai?.metrics?.vegetationLevel || 'observed',
-          direction: 'improved',
-        },
-        {
-          aspect: 'Waste Remediation',
-          before: beforeAsset.ai?.metrics?.waste || 'high',
-          after: afterAsset.ai?.metrics?.waste || 'low',
-          direction: 'improved',
-        },
-      ],
-      confidence: 'medium',
-    };
+  if (comparisonResult?.ok === false || !comparisonResult?.summary) {
+    comparisonResult = null;
   }
 
   // Calculate metric deltas from stored AI estimates
@@ -81,44 +78,46 @@ export const compareAssets = asyncHandler(async (req, res) => {
     }
   };
 
-  const metricsSummary = [
-    {
-      label: 'Tree Canopy Count',
-      before: mBefore.trees ?? 'n/a',
-      after: mAfter.trees ?? 'n/a',
-      change:
-        mBefore.trees !== undefined && mAfter.trees !== undefined
-          ? `${mAfter.trees - mBefore.trees >= 0 ? '+' : ''}${mAfter.trees - mBefore.trees}`
-          : 'n/a',
-      direction:
-        (mAfter.trees || 0) > (mBefore.trees || 0)
-          ? 'improved'
-          : (mAfter.trees || 0) < (mBefore.trees || 0)
-          ? 'worsened'
-          : 'neutral',
-    },
-    {
-      label: 'Surface Waste Level',
-      before: mBefore.waste || 'n/a',
-      after: mAfter.waste || 'n/a',
-      change: `${mBefore.waste || 'n/a'} -> ${mAfter.waste || 'n/a'}`,
-      direction: getDirection(mBefore.waste, mAfter.waste, false), // lower waste is better
-    },
-    {
-      label: 'Water Clarity',
-      before: mBefore.waterClarity || 'n/a',
-      after: mAfter.waterClarity || 'n/a',
-      change: `${mBefore.waterClarity || 'n/a'} -> ${mAfter.waterClarity || 'n/a'}`,
-      direction: getDirection(mBefore.waterClarity, mAfter.waterClarity, true),
-    },
-    {
-      label: 'Vegetation Density',
-      before: mBefore.vegetationLevel || 'n/a',
-      after: mAfter.vegetationLevel || 'n/a',
-      change: `${mBefore.vegetationLevel || 'n/a'} -> ${mAfter.vegetationLevel || 'n/a'}`,
-      direction: getDirection(mBefore.vegetationLevel, mAfter.vegetationLevel, true),
-    },
-  ];
+  const metricsSummary = comparisonResult
+    ? [
+        {
+          label: 'Tree Canopy Count',
+          before: mBefore.trees ?? 'n/a',
+          after: mAfter.trees ?? 'n/a',
+          change:
+            mBefore.trees !== undefined && mAfter.trees !== undefined
+              ? `${mAfter.trees - mBefore.trees >= 0 ? '+' : ''}${mAfter.trees - mBefore.trees}`
+              : 'n/a',
+          direction:
+            (mAfter.trees || 0) > (mBefore.trees || 0)
+              ? 'improved'
+              : (mAfter.trees || 0) < (mBefore.trees || 0)
+              ? 'worsened'
+              : 'neutral',
+        },
+        {
+          label: 'Surface Waste Level',
+          before: mBefore.waste || 'n/a',
+          after: mAfter.waste || 'n/a',
+          change: `${mBefore.waste || 'n/a'} -> ${mAfter.waste || 'n/a'}`,
+          direction: getDirection(mBefore.waste, mAfter.waste, false),
+        },
+        {
+          label: 'Water Clarity',
+          before: mBefore.waterClarity || 'n/a',
+          after: mAfter.waterClarity || 'n/a',
+          change: `${mBefore.waterClarity || 'n/a'} -> ${mAfter.waterClarity || 'n/a'}`,
+          direction: getDirection(mBefore.waterClarity, mAfter.waterClarity, true),
+        },
+        {
+          label: 'Vegetation Density',
+          before: mBefore.vegetationLevel || 'n/a',
+          after: mAfter.vegetationLevel || 'n/a',
+          change: `${mBefore.vegetationLevel || 'n/a'} -> ${mAfter.vegetationLevel || 'n/a'}`,
+          direction: getDirection(mBefore.vegetationLevel, mAfter.vegetationLevel, true),
+        },
+      ].filter((metric) => metric.before !== 'n/a' && metric.after !== 'n/a')
+    : [];
 
   // Add provenance on both assets
   const provenanceEntry = {

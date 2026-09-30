@@ -2,6 +2,22 @@ import { Asset } from '../models/Asset.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { haversineDistanceMeters } from '../utils/haversine.js';
 
+function hasUsableMedia(asset) {
+  const urls = [
+    asset?.transformations?.medium,
+    asset?.transformations?.watermarked,
+    asset?.cloudinary?.secureUrl,
+    asset?.cloudinary?.url,
+  ];
+
+  return urls.some(
+    (url) =>
+      typeof url === 'string' &&
+      /^https?:\/\//i.test(url) &&
+      !url.includes('images.unsplash.com')
+  );
+}
+
 export const getSuggestedPairs = asyncHandler(async (req, res) => {
   const { projectId } = req.query;
 
@@ -71,6 +87,10 @@ export const getSuggestedPairs = asyncHandler(async (req, res) => {
 
     const before = cluster[0];
     const after = cluster[cluster.length - 1];
+
+    if (!hasUsableMedia(before) || !hasUsableMedia(after)) {
+      continue;
+    }
 
     const timeBefore = new Date(before.exif?.takenAt || before.capturedDate).getTime();
     const timeAfter = new Date(after.exif?.takenAt || after.capturedDate).getTime();

@@ -26,7 +26,7 @@ export default function CompareViewer({
   if (!beforeUrl || !afterUrl) {
     return (
       <div className="w-full aspect-[16/10] bg-[#FBF9F4] border border-[#D8D2C4] flex items-center justify-center p-6 text-center text-sm font-mono text-[#5F6A61]">
-        A comparison is available when both evidence images are present.
+        Evidence image unavailable
       </div>
     );
   }
