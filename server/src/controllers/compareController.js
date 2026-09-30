@@ -37,6 +37,9 @@ async function executeComparison(req, res) {
   if (!beforeAsset || !afterAsset) {
     return res.status(404).json({ error: 'One or both assets could not be found.' });
   }
+  if (beforeAsset.project.toString() !== afterAsset.project.toString()) {
+    return res.status(400).json({ error: 'Comparison assets must belong to the same project.' });
+  }
 
   const beforeUrl = getUsableMediaUrl(beforeAsset);
   const afterUrl = getUsableMediaUrl(afterAsset);

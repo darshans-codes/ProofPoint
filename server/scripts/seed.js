@@ -313,14 +313,6 @@ async function seedDatabase() {
   console.log('[Seed] Connecting to MongoDB...');
   await connectDB();
 
-  // Clear existing collections for a pristine, authoritative demo experience
-  console.log('[Seed] Clearing existing collections...');
-  await Promise.all([
-    Project.deleteMany({}),
-    Asset.deleteMany({}),
-    Report.deleteMany({}),
-  ]);
-
   console.log('[Seed] Ingesting curated environmental restoration datasets...');
 
   for (const projectData of SEED_PROJECTS) {
@@ -331,13 +323,19 @@ async function seedDatabase() {
       continue;
     }
 
-    const project = await Project.create({
-      name: projectData.name,
-      location: projectData.location,
-      description: projectData.description,
-      startDate: projectData.startDate,
-    });
-    console.log(`[Seed] Created Project: "${project.name}"`);
+    const project = await Project.findOneAndUpdate(
+      { name: projectData.name },
+      {
+        $set: {
+          location: projectData.location,
+          description: projectData.description,
+          startDate: projectData.startDate,
+        },
+        $setOnInsert: { name: projectData.name },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+    console.log(`[Seed] Ready Project: "${project.name}"`);
 
     const createdProjectAssets = [];
 
@@ -345,6 +343,16 @@ async function seedDatabase() {
       const item = projectData.assets[i];
 
       if (item.localPath) {
+        const existingSource = await Asset.findOne({
+          project: project._id,
+          'sourceMetadata.url': item.sourceMetadata?.url,
+        }).select('_id');
+        if (existingSource) {
+          console.log(`  -> Preserving existing Public-Source Frame: ${existingSource._id}`);
+          createdProjectAssets.push(existingSource);
+          continue;
+        }
+
         const buffer = await readFile(new URL(item.localPath, import.meta.url));
         const exif = await extractExif(buffer);
         const phash = await dHash(buffer);

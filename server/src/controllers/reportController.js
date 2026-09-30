@@ -8,7 +8,7 @@ import { generateReportNarrative } from '../services/gemini.js';
 export const createReport = asyncHandler(async (req, res) => {
   const { title, projectId, assetIds = [], beforeId, afterId } = req.body;
 
-  if (!title || !projectId) {
+  if (!title || !projectId || !Array.isArray(assetIds) || assetIds.length === 0) {
     return res.status(400).json({ error: 'title and projectId are required.' });
   }
 
@@ -19,6 +19,16 @@ export const createReport = asyncHandler(async (req, res) => {
 
   // Find all assets to be linked
   const assets = await Asset.find({ _id: { $in: assetIds } }).select('-embedding');
+  if (assets.length !== new Set(assetIds.map(String)).size) {
+    return res.status(400).json({ error: 'All report assets must be valid and available.' });
+  }
+  if (assets.some((asset) => asset.project.toString() !== project._id.toString())) {
+    return res.status(400).json({ error: 'Report assets must belong to the selected project.' });
+  }
+  if ((beforeId && !assetIds.map(String).includes(String(beforeId))) ||
+      (afterId && !assetIds.map(String).includes(String(afterId)))) {
+    return res.status(400).json({ error: 'Before and after assets must be included in assetIds.' });
+  }
 
   const verifiedCount = assets.filter((a) => a.verification?.status === 'verified').length;
   const verifiedPercent = assets.length > 0 ? Math.round((verifiedCount / assets.length) * 100) : 0;

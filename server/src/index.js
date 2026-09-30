@@ -1,6 +1,9 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import mongoose from 'mongoose';
 import { connectDB } from './config/db.js';
 import projectRoutes from './routes/projectRoutes.js';
 import assetRoutes from './routes/assetRoutes.js';
@@ -9,12 +12,22 @@ import pairRoutes from './routes/pairRoutes.js';
 import compareRoutes from './routes/compareRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import { requireTrustedOrigin } from './middleware/security.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again shortly.' },
+});
 
 // Middleware
+app.use(helmet());
+app.use('/api', apiLimiter);
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -31,6 +44,7 @@ app.use(
 
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+app.use(requireTrustedOrigin);
 
 // Health Check
 app.get('/api/health', (req, res) => {
@@ -40,6 +54,7 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     env: {
       mongo: Boolean(process.env.MONGO_URI),
+      mongoConnected: mongoose.connection.readyState === 1,
       cloudinary: Boolean(
         process.env.CLOUDINARY_CLOUD_NAME &&
         process.env.CLOUDINARY_API_KEY &&
@@ -66,10 +81,15 @@ app.use((req, res) => {
 
 // Central Error Middleware
 app.use((err, req, res, next) => {
-  console.error('[Server Error]', err.stack || err.message);
-  const status = err.status || err.statusCode || 500;
+  console.error('[Server Error]', err.message);
+  const status =
+    err.code === 'LIMIT_FILE_SIZE' ||
+    err.code === 'LIMIT_FILE_COUNT' ||
+    err.message?.startsWith('Only image files')
+      ? 400
+      : err.status || err.statusCode || 500;
   res.status(status).json({
-    error: err.message || 'Internal server error',
+    error: status >= 500 ? 'Internal server error.' : err.message || 'Request failed.',
   });
 });
 

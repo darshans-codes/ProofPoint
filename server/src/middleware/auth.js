@@ -23,17 +23,22 @@ export function signSession(user) {
 
 export function setSessionCookie(res, token) {
   const secure = process.env.NODE_ENV === 'production';
+  const sameSite = process.env.COOKIE_SAMESITE || (secure ? 'None' : 'Lax');
+  if (sameSite === 'None' && !secure) {
+    throw new Error('COOKIE_SAMESITE=None requires NODE_ENV=production.');
+  }
   res.setHeader(
     'Set-Cookie',
-    `${COOKIE_NAME}=${encodeURIComponent(token)}; HttpOnly; Path=/; Max-Age=7200; SameSite=Lax${secure ? '; Secure' : ''}`
+    `${COOKIE_NAME}=${encodeURIComponent(token)}; HttpOnly; Path=/; Max-Age=7200; SameSite=${sameSite}${secure ? '; Secure' : ''}`
   );
 }
 
 export function clearSessionCookie(res) {
   const secure = process.env.NODE_ENV === 'production';
+  const sameSite = process.env.COOKIE_SAMESITE || (secure ? 'None' : 'Lax');
   res.setHeader(
     'Set-Cookie',
-    `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secure ? '; Secure' : ''}`
+    `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=${sameSite}${secure ? '; Secure' : ''}`
   );
 }
 

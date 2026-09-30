@@ -30,7 +30,12 @@ export const loginWithGoogle = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Google credential is required.' });
   }
 
-  const ticket = await googleClient.verifyIdToken({ idToken: credential, audience });
+  let ticket;
+  try {
+    ticket = await googleClient.verifyIdToken({ idToken: credential, audience });
+  } catch {
+    return res.status(401).json({ error: 'Google credential is invalid or expired.' });
+  }
   const payload = ticket.getPayload();
   if (
     !payload?.sub ||

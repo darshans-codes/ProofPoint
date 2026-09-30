@@ -8,6 +8,7 @@ import {
   reanalyzeAsset,
 } from '../controllers/assetController.js';
 import { requireAuth } from '../middleware/auth.js';
+import { expensiveOperationLimiter, validateObjectId } from '../middleware/security.js';
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -27,10 +28,10 @@ const upload = multer({
 
 const router = Router();
 
-router.post('/', requireAuth, upload.array('files', 15), uploadAssets);
-router.get('/', getAssets);
-router.get('/:id', getAssetById);
-router.delete('/:id', requireAuth, deleteAsset);
-router.post('/:id/reanalyze', requireAuth, reanalyzeAsset);
+router.post('/', requireAuth, expensiveOperationLimiter, upload.array('files', 15), uploadAssets);
+router.get('/', validateObjectId('projectId'), getAssets);
+router.get('/:id', validateObjectId('id'), getAssetById);
+router.delete('/:id', requireAuth, validateObjectId('id'), deleteAsset);
+router.post('/:id/reanalyze', requireAuth, expensiveOperationLimiter, validateObjectId('id'), reanalyzeAsset);
 
 export default router;
