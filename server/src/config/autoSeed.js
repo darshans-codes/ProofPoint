@@ -4,6 +4,26 @@ import { Report } from '../models/Report.js';
 
 export async function autoSeedIfEmpty() {
   try {
+    // Repair any legacy/dead seed image URLs
+    await Asset.updateMany(
+      {
+        $or: [
+          { 'cloudinary.url': { $regex: 'photo-1511497584788' } },
+          { 'transformations.medium': { $regex: 'photo-1511497584788' } },
+          { 'transformations.thumb': { $regex: 'photo-1511497584788' } },
+        ],
+      },
+      {
+        $set: {
+          'cloudinary.url': 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80',
+          'cloudinary.secureUrl': 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80',
+          'transformations.thumb': 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=400&q=70',
+          'transformations.medium': 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80',
+          'transformations.watermarked': 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80',
+        },
+      }
+    );
+
     const count = await Project.countDocuments();
     if (count > 0) return;
 
@@ -82,8 +102,8 @@ export async function autoSeedIfEmpty() {
       kind: 'image',
       cloudinary: {
         publicId: 'watts_branch_after_demo',
-        url: 'https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=1200&q=80',
-        secureUrl: 'https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=1200&q=80',
+        url: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80',
+        secureUrl: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80',
         width: 1200,
         height: 800,
         format: 'jpg',
@@ -91,9 +111,9 @@ export async function autoSeedIfEmpty() {
         resourceType: 'image',
       },
       transformations: {
-        thumb: 'https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=400&q=70',
-        medium: 'https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=1200&q=80',
-        watermarked: 'https://images.unsplash.com/photo-1511497584788-87676104235f?auto=format&fit=crop&w=1200&q=80',
+        thumb: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=400&q=70',
+        medium: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80',
+        watermarked: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80',
       },
       ai: {
         caption: 'Public-source post-intervention photograph showing stabilized riverbank and lush native shrub vegetation.',
