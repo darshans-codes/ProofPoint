@@ -20,6 +20,14 @@ ProofPoint is an environmental evidence platform for ingesting field imagery, ch
 
 ## Setup
 
+### macOS / Linux / Bash / Zsh:
+```bash
+cp server/.env.example server/.env
+cp client/.env.example client/.env
+npm run install:all
+```
+
+### Windows (PowerShell):
 ```powershell
 Copy-Item server/.env.example server/.env
 Copy-Item client/.env.example client/.env
@@ -49,13 +57,13 @@ Add the exact deployed frontend origin before production use. The browser sends 
 
 ## Local development
 
-```powershell
+```bash
 npm run dev
 ```
 
 Or separately:
 
-```powershell
+```bash
 npm run server
 npm run client
 ```
@@ -66,7 +74,7 @@ The frontend runs on Vite's selected local port, normally `5173`; the API runs o
 
 The curated Watts Branch public-source demo is stored under `server/seed-images/watts-branch-demo`. Seeding is idempotent for the approved local public-source records and does not clear the database:
 
-```powershell
+```bash
 npm run seed --prefix server
 ```
 
@@ -78,12 +86,23 @@ Public routes are `/` and `/story/:slug`. `/login` uses Google Identity Services
 
 ## Build, lint, and QA
 
+Make sure `npm run install:all` has been run first:
+
+```bash
+npm run build
+npm run lint
+cd server && node --check src/index.js && node --check src/controllers/authController.js
+```
+
+Or on PowerShell:
+
 ```powershell
 npm run build
 npm run lint
 Set-Location server
 node --check src/index.js
 node --check src/controllers/authController.js
+Set-Location ..
 ```
 
 The frontend bundle includes the 3D and mapping dependencies and can produce a large-but-non-blocking bundle warning. Avoid repeated Gemini calls during QA; comparisons and analysis are queued, paced, cached, and coalesced.
