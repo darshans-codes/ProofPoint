@@ -6,6 +6,7 @@ import AssetCard from '../components/AssetCard';
 import VerificationStamp from '../components/VerificationStamp';
 import SkeletonGrid from '../components/SkeletonGrid';
 import EmptyState from '../components/EmptyState';
+import EvidenceImage from '../components/EvidenceImage';
 import { ArrowRight, Layers, FileText, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 export default function Overview() {
@@ -22,10 +23,12 @@ export default function Overview() {
   const [reports, setReports] = useState([]);
   const [uploadsOverTime, setUploadsOverTime] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     async function loadData() {
       setLoading(true);
+      setErrorMessage('');
       try {
         const params = {};
         if (selectedProjectId !== 'all') {
@@ -63,6 +66,7 @@ export default function Overview() {
         setUploadsOverTime(Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)).slice(-14));
       } catch (err) {
         console.error('[Overview] Error loading data:', err);
+        setErrorMessage(err.response?.data?.error || 'Overview records could not be loaded.');
       } finally {
         setLoading(false);
       }
@@ -73,6 +77,7 @@ export default function Overview() {
 
   return (
     <div className="space-y-12">
+      {errorMessage && <div className="border border-[#A63A2B] bg-[#F3DAD5] p-3 text-xs font-mono text-[#A63A2B]" role="alert">{errorMessage}</div>}
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-[#D8D2C4] pb-6 gap-4">
         <div>
@@ -254,13 +259,6 @@ export default function Overview() {
             ) : (
               <div className="divide-y divide-[#D8D2C4] border border-[#D8D2C4] bg-[#FBF9F4]">
                 {suggestedPairs.map((pair) => {
-                  const beforeThumb =
-                    pair.before.transformations?.thumb ||
-                    pair.before.cloudinary?.secureUrl;
-                  const afterThumb =
-                    pair.after.transformations?.thumb ||
-                    pair.after.cloudinary?.secureUrl;
-
                   return (
                     <Link
                       key={pair.id}
@@ -271,16 +269,8 @@ export default function Overview() {
                       <div className="flex items-center gap-3">
                         {/* Dual mini-thumbnails */}
                         <div className="flex items-center -space-x-2">
-                          <img
-                            src={beforeThumb}
-                            alt="Before"
-                            className="w-12 h-10 object-cover border border-[#D8D2C4] rounded-[1px]"
-                          />
-                          <img
-                            src={afterThumb}
-                            alt="After"
-                            className="w-12 h-10 object-cover border border-[#D8D2C4] rounded-[1px]"
-                          />
+                          <EvidenceImage asset={pair.before} alt="Before" className="w-12 h-10 object-cover border border-[#D8D2C4] rounded-[1px]" />
+                          <EvidenceImage asset={pair.after} alt="After" className="w-12 h-10 object-cover border border-[#D8D2C4] rounded-[1px]" />
                         </div>
 
                         <div className="text-left">

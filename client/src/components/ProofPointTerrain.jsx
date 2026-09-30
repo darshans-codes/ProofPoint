@@ -3,6 +3,22 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 
+class TerrainErrorBoundary extends React.Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch() {
+    this.props.onError();
+  }
+
+  render() {
+    return this.state.hasError ? null : this.props.children;
+  }
+}
+
 function latLngToVector3(lat, lng, radius = 2.4) {
   const phi = (90 - lat) * (Math.PI / 180);
   const theta = (lng + 180) * (Math.PI / 180);
@@ -68,8 +84,8 @@ function ProjectMarker({ loc, position }) {
         <sphereGeometry args={[hovered ? 0.08 : 0.05, 16, 16]} />
         <meshStandardMaterial
           color={hovered ? '#E4EEE7' : '#2F5D46'}
-          emissive={hovered ? '#2F6B4A' : '#1C3A2C'}
-          emissiveIntensity={hovered ? 0.8 : 0.2}
+          roughness={0.7}
+          metalness={0}
         />
       </mesh>
 
@@ -120,20 +136,29 @@ export default function ProofPointTerrain({ className = 'h-[500px] w-full', loca
       </div>
 
       {hasWebGL && locations.length > 0 ? (
-        <Canvas
-          camera={{ position: [0, 1.2, 4.6], fov: 42 }}
-          dpr={reducedMotion ? 1 : [1, 1.5]}
-          gl={{ antialias: true, alpha: true }}
-          onCreated={({ gl }) => {
-            gl.domElement.addEventListener('webglcontextlost', () => setHasWebGL(false), { once: true });
-          }}
-        >
-          <ambientLight intensity={0.7} />
-          <directionalLight position={[5, 8, 4]} intensity={1.1} color="#FFFDF7" />
-          <Suspense fallback={null}>
-            <GlobeWireframe radius={2.2} locations={locations} reducedMotion={reducedMotion} />
-          </Suspense>
-        </Canvas>
+        <TerrainErrorBoundary onError={() => setHasWebGL(false)}>
+          <Canvas
+            camera={{ position: [0, 1.2, 4.6], fov: 42 }}
+            dpr={reducedMotion ? 1 : [1, 1.5]}
+            gl={{ antialias: true, alpha: true }}
+            onCreated={({ gl }) => {
+              if (!gl.getContext()) {
+                setHasWebGL(false);
+                return;
+              }
+              gl.domElement.addEventListener('webglcontextlost', (event) => {
+                event.preventDefault();
+                setHasWebGL(false);
+              }, { once: true });
+            }}
+          >
+            <ambientLight intensity={0.7} />
+            <directionalLight position={[5, 8, 4]} intensity={1.1} color="#FFFDF7" />
+            <Suspense fallback={null}>
+              <GlobeWireframe radius={2.2} locations={locations} reducedMotion={reducedMotion} />
+            </Suspense>
+          </Canvas>
+        </TerrainErrorBoundary>
       ) : (
         <div className="h-full flex items-center justify-center px-8 text-center">
           <div>

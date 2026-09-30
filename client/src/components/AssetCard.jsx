@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import VerificationStamp from './VerificationStamp';
+import EvidenceImage from './EvidenceImage';
 
 export default function AssetCard({
   asset,
@@ -12,12 +13,6 @@ export default function AssetCard({
   if (!asset) return null;
 
   const frameId = `PP-${(asset._id || '').slice(-4).toUpperCase()}`;
-  const imageUrl =
-    asset.transformations?.thumb ||
-    asset.cloudinary?.secureUrl ||
-    asset.cloudinary?.url ||
-    '/placeholder.jpg';
-
   const dateStr = asset.capturedDate
     ? new Date(asset.capturedDate).toISOString().split('T')[0]
     : 'Unknown Date';
@@ -32,8 +27,8 @@ export default function AssetCard({
     >
       {/* Photo Frame */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#E8E4DA]">
-        <img
-          src={imageUrl}
+        <EvidenceImage
+          asset={asset}
           alt={asset.ai?.caption || `${asset.projectName || 'Field'} evidence photo`}
           loading="lazy"
           className="w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.02]"

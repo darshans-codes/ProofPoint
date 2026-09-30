@@ -7,6 +7,7 @@ import VerificationStamp from '../components/VerificationStamp';
 import SkeletonGrid from '../components/SkeletonGrid';
 import EmptyState from '../components/EmptyState';
 import Ledger from '../components/Ledger';
+import EvidenceImage from '../components/EvidenceImage';
 import { LayoutGrid, Table as TableIcon, Filter, X, ArrowUpDown } from 'lucide-react';
 
 export default function Gallery() {
@@ -14,6 +15,7 @@ export default function Gallery() {
 
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
 
   // Filters
@@ -25,6 +27,7 @@ export default function Gallery() {
 
   const fetchGalleryAssets = async () => {
     setLoading(true);
+    setErrorMessage('');
     try {
       const params = {};
       if (selectedProjectId !== 'all') params.projectId = selectedProjectId;
@@ -38,6 +41,7 @@ export default function Gallery() {
       if (data.counts) setCounts(data.counts);
     } catch (err) {
       console.error('[Gallery Error]', err);
+      setErrorMessage(err.response?.data?.error || 'Gallery records could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -72,8 +76,8 @@ export default function Gallery() {
     {
       header: 'IMAGE',
       accessor: (row) => (
-        <img
-          src={row.transformations?.thumb || row.cloudinary?.secureUrl}
+        <EvidenceImage
+          asset={row}
           alt={row.locationName}
           className="w-14 h-10 object-cover border border-[#D8D2C4] rounded-[1px]"
         />
@@ -116,6 +120,7 @@ export default function Gallery() {
 
   return (
     <div className="space-y-8">
+      {errorMessage && <div className="border border-[#A63A2B] bg-[#F3DAD5] p-3 text-xs font-mono text-[#A63A2B]" role="alert">{errorMessage}</div>}
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-[#D8D2C4] pb-6 gap-4">
         <div>

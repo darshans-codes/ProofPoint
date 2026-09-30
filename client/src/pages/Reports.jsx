@@ -5,6 +5,7 @@ import { useProject } from '../context/ProjectContext';
 import VerificationStamp from '../components/VerificationStamp';
 import Ledger from '../components/Ledger';
 import EmptyState from '../components/EmptyState';
+import EvidenceImage from '../components/EvidenceImage';
 import { Plus, ArrowRight, FileText, Check, ShieldCheck, X } from 'lucide-react';
 
 export default function Reports() {
@@ -24,6 +25,7 @@ export default function Reports() {
   const [suggestedPairs, setSuggestedPairs] = useState([]);
   const [selectedPair, setSelectedPair] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const closeButtonRef = useRef(null);
 
   useEffect(() => {
@@ -38,6 +40,7 @@ export default function Reports() {
 
   const fetchReportsList = async () => {
     setLoading(true);
+    setErrorMessage('');
     try {
       const data = await getReports(
         selectedProjectId !== 'all' ? selectedProjectId : undefined
@@ -45,6 +48,7 @@ export default function Reports() {
       setReports(data);
     } catch (err) {
       console.error('[Reports Error]', err);
+      setErrorMessage(err.response?.data?.error || 'Reports could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -119,13 +123,9 @@ export default function Reports() {
     {
       header: 'HERO SPECIMEN',
       accessor: (r) => {
-        const thumb =
-          r.heroAssetId?.transformations?.thumb ||
-          r.heroAssetId?.cloudinary?.secureUrl ||
-          '/placeholder.jpg';
         return (
-          <img
-            src={thumb}
+          <EvidenceImage
+            asset={r.heroAssetId}
             alt="Hero thumbnail"
             className="w-16 h-11 object-cover border border-[#D8D2C4] rounded-[1px]"
           />
@@ -184,6 +184,7 @@ export default function Reports() {
 
   return (
     <div className="space-y-8 max-w-[1360px] mx-auto">
+      {errorMessage && <div className="border border-[#A63A2B] bg-[#F3DAD5] p-3 text-xs font-mono text-[#A63A2B]" role="alert">{errorMessage}</div>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-[#D8D2C4] pb-6 gap-4">
         <div>
@@ -316,8 +317,8 @@ export default function Reports() {
                                 : 'border-[#D8D2C4] bg-[#FBF9F4]'
                             }`}
                           >
-                            <img
-                              src={asset.transformations?.thumb || asset.cloudinary?.secureUrl}
+                            <EvidenceImage
+                              asset={asset}
                               alt="thumb"
                               className="w-full aspect-[4/3] object-cover mb-1"
                             />
@@ -366,13 +367,13 @@ export default function Reports() {
                           >
                             <div className="flex items-center gap-3">
                               <div className="flex items-center -space-x-2">
-                                <img
-                                  src={p.before.transformations?.thumb || p.before.cloudinary?.secureUrl}
+                                <EvidenceImage
+                                  asset={p.before}
                                   alt="before"
                                   className="w-12 h-9 object-cover border border-[#D8D2C4]"
                                 />
-                                <img
-                                  src={p.after.transformations?.thumb || p.after.cloudinary?.secureUrl}
+                                <EvidenceImage
+                                  asset={p.after}
                                   alt="after"
                                   className="w-12 h-9 object-cover border border-[#D8D2C4]"
                                 />

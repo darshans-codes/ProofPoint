@@ -4,6 +4,7 @@ import { getAssetById, reanalyzeAsset, deleteAsset } from '../api/client';
 import VerificationStamp from '../components/VerificationStamp';
 import AiEstimateTag from '../components/AiEstimateTag';
 import Ledger from '../components/Ledger';
+import EvidenceImage from '../components/EvidenceImage';
 import {
   ArrowLeft,
   RotateCw,
@@ -26,6 +27,7 @@ export default function AssetDetail() {
   const [activeTab, setActiveTab] = useState('medium'); // 'medium' | 'watermarked' | 'original'
   const [reanalyzing, setReanalyzing] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
+  const [copyError, setCopyError] = useState('');
 
   const fetchAsset = async () => {
     setLoading(true);
@@ -68,9 +70,13 @@ export default function AssetDetail() {
 
   const copyPublicId = () => {
     if (asset?.cloudinary?.publicId) {
-      navigator.clipboard.writeText(asset.cloudinary.publicId);
-      setCopiedId(true);
-      setTimeout(() => setCopiedId(false), 2000);
+      navigator.clipboard.writeText(asset.cloudinary.publicId)
+        .then(() => {
+          setCopyError('');
+          setCopiedId(true);
+          setTimeout(() => setCopiedId(false), 2000);
+        })
+        .catch(() => setCopyError('Copy is unavailable in this browser. Select the public ID manually.'));
     }
   };
 
@@ -93,11 +99,11 @@ export default function AssetDetail() {
   const frameId = `PP-${asset._id.slice(-4).toUpperCase()}`;
 
   // Image source based on active tab
-  let displayUrl = asset.transformations?.medium || asset.cloudinary?.secureUrl;
+  let displayVariant = 'medium';
   if (activeTab === 'watermarked') {
-    displayUrl = asset.transformations?.watermarked || displayUrl;
+    displayVariant = 'watermarked';
   } else if (activeTab === 'original') {
-    displayUrl = asset.cloudinary?.secureUrl || displayUrl;
+    displayVariant = 'original';
   }
 
   // Verification checks table definition
@@ -244,8 +250,9 @@ export default function AssetDetail() {
                 className="max-h-[640px] w-full"
               />
             ) : (
-              <img
-                src={displayUrl}
+              <EvidenceImage
+                asset={asset}
+                variant={displayVariant}
                 alt={asset.ai?.caption || 'Evidence specimen'}
                 className="max-h-[640px] w-full object-contain"
               />
@@ -390,12 +397,14 @@ export default function AssetDetail() {
             </div>
             <button
               onClick={copyPublicId}
+              aria-label="Copy Cloudinary storage ID"
               className="inline-flex items-center gap-1 text-[#2F5D46] hover:underline"
             >
               {copiedId ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copiedId ? 'COPIED TO CLIPBOARD' : 'COPY STORAGE ID'}</span>
             </button>
           </div>
+          {copyError && <p className="text-xs font-mono text-[#A63A2B]" role="alert">{copyError}</p>}
 
           <Ledger
             title="Cryptographic Chain of Custody & Provenance History"

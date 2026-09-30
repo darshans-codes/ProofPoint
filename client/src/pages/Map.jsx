@@ -4,6 +4,7 @@ import L from 'leaflet';
 import { getAllAssets } from '../api/client';
 import { useProject } from '../context/ProjectContext';
 import VerificationStamp from '../components/VerificationStamp';
+import EvidenceImage from '../components/EvidenceImage';
 import { Play, Pause, RotateCcw, Calendar, Layers, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -186,14 +187,13 @@ export default function MapPage() {
 
                 const icon = createSquareIcon(asset.verification?.status);
                 const frameId = `PP-${asset._id.slice(-4).toUpperCase()}`;
-                const thumb = asset.transformations?.thumb || asset.cloudinary?.secureUrl;
 
                 return (
                   <Marker key={asset._id} position={[lat, lng]} icon={icon}>
                     <Popup className="proofpoint-popup">
                       <div className="w-56 p-1 space-y-2 text-left font-sans">
-                        <img
-                          src={thumb}
+                        <EvidenceImage
+                          asset={asset}
                           alt="Thumbnail"
                           className="w-full h-28 object-cover border border-[#D8D2C4] rounded-[1px]"
                         />
@@ -291,8 +291,8 @@ export default function MapPage() {
               to={`/app/assets/${a._id}`}
               className="group block border border-[#D8D2C4] bg-[#F5F2EB] p-1.5 rounded-[1px] hover:border-[#1B221D] transition-colors"
             >
-              <img
-                src={a.transformations?.thumb || a.cloudinary?.secureUrl}
+              <EvidenceImage
+                asset={a}
                 alt="thumb"
                 className="w-full aspect-[4/3] object-cover mb-1"
               />

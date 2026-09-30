@@ -5,6 +5,7 @@ import CompareViewer from '../components/CompareViewer';
 import VerificationStamp from '../components/VerificationStamp';
 import AiEstimateTag from '../components/AiEstimateTag';
 import Ledger from '../components/Ledger';
+import EvidenceImage from '../components/EvidenceImage';
 import { ArrowLeft, Printer, Share2, Copy, Check, ShieldCheck, MapPin } from 'lucide-react';
 
 export default function Story() {
@@ -12,6 +13,7 @@ export default function Story() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copiedCaption, setCopiedCaption] = useState(false);
+  const [copyError, setCopyError] = useState('');
 
   useEffect(() => {
     async function loadStory() {
@@ -31,9 +33,13 @@ export default function Story() {
 
   const copyShareText = () => {
     if (report?.socialCaption) {
-      navigator.clipboard.writeText(report.socialCaption);
-      setCopiedCaption(true);
-      setTimeout(() => setCopiedCaption(false), 2000);
+      navigator.clipboard.writeText(report.socialCaption)
+        .then(() => {
+          setCopyError('');
+          setCopiedCaption(true);
+          setTimeout(() => setCopiedCaption(false), 2000);
+        })
+        .catch(() => setCopyError('Copy is unavailable in this browser. Select the text manually.'));
     }
   };
 
@@ -60,15 +66,18 @@ export default function Story() {
     );
   }
 
-  const heroImage =
-    report.heroAssetId?.transformations?.medium ||
-    report.heroAssetId?.cloudinary?.secureUrl ||
-    report.beforeAssetId?.transformations?.medium ||
-    '/placeholder.jpg';
+  const heroImage = report.heroAssetId || report.beforeAssetId;
 
   const assets = report.assetIds || [];
 
-  // Summary audit checks for the appendix
+  const verificationRows = assets.flatMap((asset) =>
+    (asset.verification?.checks || []).map((check) => ({
+      factor: check.name,
+      method: check.detail || 'Recorded verification check.',
+      rate: check.passed ? 'PASSED' : 'NEEDS REVIEW',
+    }))
+  );
+
   const appendixColumns = [
     {
       header: 'VERIFICATION AUDIT FACTOR',
@@ -84,28 +93,9 @@ export default function Story() {
     },
   ];
 
-  const appendixRows = [
-    {
-      factor: 'Hardware GPS Geolocation',
-      method: 'Direct EXIF payload extraction cross-referenced against concession boundary',
-      rate: `${report.verifiedPercent}% PASSED`,
-    },
-    {
-      factor: 'Shutter Actuation Timestamp',
-      method: 'Camera sensor DateTimeOriginal check against claimed reporting cycle',
-      rate: '100% MATCH',
-    },
-    {
-      factor: 'Perceptual Duplicate Detection',
-      method: '64-bit dHash gradient comparisons against historical archive',
-      rate: '0 DUPLICATES DETECTED',
-    },
-    {
-      factor: 'Multimodal Environmental Metrics',
-      method: 'Gemini vision estimates for canopy recovery and waste remediation',
-      rate: 'ANALYZED & VERIFIED',
-    },
-  ];
+  const appendixRows = verificationRows.length
+    ? verificationRows
+    : [{ factor: 'Verification checks', method: 'No check details were recorded for this report.', rate: 'NOT AVAILABLE' }];
 
   return (
     <article className="min-h-screen bg-[#F5F2EB] text-[#1B221D] selection:bg-[#2F5D46] selection:text-[#FBF9F4]">
@@ -171,8 +161,9 @@ export default function Story() {
 
         {/* Large Hero Photography Frame */}
         <div className="relative w-full aspect-[16/10] border border-[#D8D2C4] bg-[#1B221D] overflow-hidden rounded-[2px]">
-          <img
-            src={heroImage}
+          <EvidenceImage
+            asset={heroImage}
+            variant="medium"
             alt={report.title}
             className="w-full h-full object-cover"
           />
@@ -260,8 +251,6 @@ export default function Story() {
             <CompareViewer
               beforeAsset={report.beforeAssetId}
               afterAsset={report.afterAssetId}
-              distanceMeters={18}
-              daysBetween={92}
             />
           </div>
         )}
@@ -284,8 +273,8 @@ export default function Story() {
                   key={asset._id}
                   className="border border-[#D8D2C4] bg-[#FBF9F4] p-2 rounded-[1px] space-y-2"
                 >
-                  <img
-                    src={asset.transformations?.thumb || asset.cloudinary?.secureUrl}
+                  <EvidenceImage
+                    asset={asset}
                     alt={asset.locationName}
                     className="w-full aspect-[4/3] object-cover"
                   />
@@ -326,12 +315,14 @@ export default function Story() {
               </span>
               <button
                 onClick={copyShareText}
+                aria-label="Copy recommended disclosure caption"
                 className="text-xs font-mono text-[#2F5D46] hover:underline inline-flex items-center gap-1"
               >
                 {copiedCaption ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copiedCaption ? 'COPIED' : 'COPY CAPTION'}</span>
               </button>
             </div>
+            {copyError && <p className="text-xs font-mono text-[#A63A2B]" role="alert">{copyError}</p>}
             <p className="font-mono text-xs text-[#1B221D] leading-relaxed">
               "{report.socialCaption}"
             </p>

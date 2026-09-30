@@ -6,6 +6,7 @@ import CompareViewer from '../components/CompareViewer';
 import VerificationStamp from '../components/VerificationStamp';
 import AiEstimateTag from '../components/AiEstimateTag';
 import Ledger from '../components/Ledger';
+import EvidenceImage from '../components/EvidenceImage';
 import { ArrowRight, FilePlus, Sparkles, CheckCircle2, RefreshCw } from 'lucide-react';
 
 export default function Compare() {
@@ -156,8 +157,6 @@ export default function Compare() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {pairs.map((p) => {
               const isSelected = selectedPair?.id === p.id;
-              const beforeImg = p.before.transformations?.thumb || p.before.cloudinary?.secureUrl;
-              const afterImg = p.after.transformations?.thumb || p.after.cloudinary?.secureUrl;
 
               return (
                 <div
@@ -171,8 +170,8 @@ export default function Compare() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex items-center -space-x-2 flex-shrink-0">
-                      <img src={beforeImg} alt="Before" className="w-12 h-9 object-cover border border-[#D8D2C4]" />
-                      <img src={afterImg} alt="After" className="w-12 h-9 object-cover border border-[#D8D2C4]" />
+                      <EvidenceImage asset={p.before} alt="Before" className="w-12 h-9 object-cover border border-[#D8D2C4]" />
+                      <EvidenceImage asset={p.after} alt="After" className="w-12 h-9 object-cover border border-[#D8D2C4]" />
                     </div>
                     <div>
                       <div className="font-serif text-sm font-semibold text-[#1B221D] truncate max-w-[160px]">

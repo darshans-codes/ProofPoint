@@ -4,6 +4,7 @@ import {
   ReactCompareSliderImage,
   ReactCompareSliderHandle,
 } from 'react-compare-slider';
+import { getEvidenceImageUrl } from '../lib/media';
 
 export default function CompareViewer({
   beforeAsset,
@@ -19,15 +20,16 @@ export default function CompareViewer({
     );
   }
 
-  const beforeUrl =
-    beforeAsset.transformations?.medium ||
-    beforeAsset.cloudinary?.secureUrl ||
-    beforeAsset.cloudinary?.url;
+  const beforeUrl = getEvidenceImageUrl(beforeAsset, 'medium');
+  const afterUrl = getEvidenceImageUrl(afterAsset, 'medium');
 
-  const afterUrl =
-    afterAsset.transformations?.medium ||
-    afterAsset.cloudinary?.secureUrl ||
-    afterAsset.cloudinary?.url;
+  if (!beforeUrl || !afterUrl) {
+    return (
+      <div className="w-full aspect-[16/10] bg-[#FBF9F4] border border-[#D8D2C4] flex items-center justify-center p-6 text-center text-sm font-mono text-[#5F6A61]">
+        A comparison is available when both evidence images are present.
+      </div>
+    );
+  }
 
   const beforeDate = beforeAsset.capturedDate
     ? new Date(beforeAsset.capturedDate).toISOString().split('T')[0]
