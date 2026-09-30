@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion, useReducedMotion } from 'motion/react';
 import ProofPointTerrain from '../components/ProofPointTerrain';
 import CompareViewer from '../components/CompareViewer';
 import VerificationStamp from '../components/VerificationStamp';
@@ -106,6 +107,7 @@ const TRANSFORMATION_STEPS = [
 ];
 
 export default function Landing() {
+  const reduceMotion = useReducedMotion();
   const [activeStep, setActiveStep] = useState(0);
   const [landingData, setLandingData] = useState({ assets: [], pairs: [], projects: [], error: null });
 
@@ -187,9 +189,14 @@ export default function Landing() {
               <span>FIELD RECORDS / PROJECT 02</span>
             </div>
 
-            <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-normal leading-[1.08] tracking-tight text-[#1B221D] mb-6">
+            <motion.h1
+              initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+              className="font-serif text-4xl sm:text-5xl lg:text-6xl font-normal leading-[1.08] tracking-tight text-[#1B221D] mb-6"
+            >
               Proof for the work you did in the field.
-            </h1>
+            </motion.h1>
 
             <p className="text-lg sm:text-xl font-sans text-[#5F6A61] leading-relaxed max-w-2xl mb-8">
               Upload field photos. ProofPoint checks where and when they were taken, catches duplicates, measures what changed, and turns the verified set into a transparent report donors can audit.
